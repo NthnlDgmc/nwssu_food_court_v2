@@ -7,6 +7,18 @@ require_once '../vendor/autoload.php';
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
+define('RESEND_COOLDOWN_SECONDS', 30);
+define('MAX_VERIFY_ATTEMPTS', 5);
+
+function isStrongPassword($password)
+{
+  if (strlen($password) < 8) return false;
+  if (!preg_match('/[A-Z]/', $password)) return false;
+  if (!preg_match('/[0-9]/', $password)) return false;
+  if (!preg_match('/[^A-Za-z0-9]/', $password)) return false;
+  return true;
+}
+
 function findUserByEmail($conn, $email)
 {
   $stmt = $conn->prepare("SELECT admin_id FROM admin WHERE email = ? LIMIT 1");
@@ -73,6 +85,7 @@ function sendResetCodeEmail($toEmail, $code)
 {
   $mail = new PHPMailer(true);
   try {
+    $mail->CharSet = PHPMailer::CHARSET_UTF8;
     $mail->isSMTP();
     $mail->Host = 'smtp.gmail.com';
     $mail->SMTPAuth = true;
@@ -103,10 +116,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
   $action = $_POST['action'];
 
   if ($action === 'send_code') {
-    $email = trim($_POST['email'] ?? '');
+    $email = strtolower(preg_replace('/\s+/', '', $_POST['email'] ?? ''));
 
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
       echo json_encode(['success' => false, 'message' => 'Please enter a valid email address.']);
+      $conn->close();
+      exit;
+    }
+
+    $lastSentAt = $_SESSION['reset_last_sent_at'] ?? 0;
+    $secondsSinceLastSend = time() - $lastSentAt;
+
+    if ($secondsSinceLastSend < RESEND_COOLDOWN_SECONDS) {
+      $waitSeconds = RESEND_COOLDOWN_SECONDS - $secondsSinceLastSend;
+      echo json_encode([
+        'success' => false,
+        'message' => 'Please wait ' . $waitSeconds . ' seconds before requesting a new code.',
+        'wait_seconds' => $waitSeconds,
+      ]);
       $conn->close();
       exit;
     }
@@ -130,17 +157,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       sendResetCodeEmail($email, $code);
     }
 
-    echo json_encode(['success' => true, 'message' => 'If that email exists in our system, a reset code has been sent.']);
+    $_SESSION['reset_last_sent_at'] = time();
+    $_SESSION['reset_verify_attempts'] = 0;
+
+    echo json_encode(['success' => true, 'message' => 'If that email exists in our system, a reset code has been sent.', 'wait_seconds' => RESEND_COOLDOWN_SECONDS]);
     $conn->close();
     exit;
   }
 
   if ($action === 'verify_code') {
-    $email = trim($_POST['email'] ?? '');
+    $email = strtolower(preg_replace('/\s+/', '', $_POST['email'] ?? ''));
     $code = trim($_POST['code'] ?? '');
 
     if ($email === '' || $code === '') {
       echo json_encode(['success' => false, 'message' => 'Please enter the code sent to your email.']);
+      $conn->close();
+      exit;
+    }
+
+    $attempts = $_SESSION['reset_verify_attempts'] ?? 0;
+
+    if ($attempts >= MAX_VERIFY_ATTEMPTS) {
+      echo json_encode([
+        'success' => false,
+        'message' => 'Too many incorrect attempts. Please request a new code.',
+        'locked' => true,
+      ]);
       $conn->close();
       exit;
     }
@@ -152,10 +194,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $stmt->close();
 
     if (!$row || strtotime($row['expires_at']) < time()) {
-      echo json_encode(['success' => false, 'message' => 'Invalid or expired code. Please try again.']);
+      $attempts++;
+      $_SESSION['reset_verify_attempts'] = $attempts;
+      $attemptsLeft = MAX_VERIFY_ATTEMPTS - $attempts;
+
+      if ($attemptsLeft <= 0) {
+        echo json_encode([
+          'success' => false,
+          'message' => 'Too many incorrect attempts. Please request a new code.',
+          'locked' => true,
+        ]);
+      } else {
+        echo json_encode([
+          'success' => false,
+          'message' => 'Invalid or expired code. Please try again.',
+          'attempts_left' => $attemptsLeft,
+        ]);
+      }
       $conn->close();
       exit;
     }
+
+    $_SESSION['reset_verify_attempts'] = 0;
 
     echo json_encode(['success' => true]);
     $conn->close();
@@ -163,12 +223,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
   }
 
   if ($action === 'reset_password') {
-    $email = trim($_POST['email'] ?? '');
+    $email = strtolower(preg_replace('/\s+/', '', $_POST['email'] ?? ''));
     $code = trim($_POST['code'] ?? '');
     $newPassword = $_POST['new_password'] ?? '';
 
-    if ($newPassword === '' || strlen($newPassword) < 8) {
-      echo json_encode(['success' => false, 'message' => 'Password must be at least 8 characters.']);
+    if (!isStrongPassword($newPassword)) {
+      echo json_encode(['success' => false, 'message' => 'Password must be at least 8 characters and include an uppercase letter, a number, and a symbol.']);
       $conn->close();
       exit;
     }
@@ -192,6 +252,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       $stmt->bind_param("i", $row['reset_id']);
       $stmt->execute();
       $stmt->close();
+
+      unset($_SESSION['reset_last_sent_at']);
+      unset($_SESSION['reset_verify_attempts']);
     }
 
     echo json_encode($ok
@@ -215,7 +278,7 @@ $conn->close();
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>NWSSU Food Court — Forgot Password</title>
     <link rel="icon" href="../assets/images/nwssu-logo.png" type="image/png" />
-    <link rel="manifest" href="/nwssu_food_court/manifest.json" />
+    <link rel="manifest" href="../manifest.json" />
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
@@ -391,9 +454,10 @@ $conn->close();
           <button
             type="button"
             id="sendResetBtn"
-            class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 rounded-[3px]"
+            class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-70 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 rounded-[3px]"
           >
             <svg
+              id="sendResetDefaultIcon"
               class="w-4 h-4"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
@@ -406,6 +470,16 @@ $conn->close();
                 stroke-linejoin="round"
                 d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"
               />
+            </svg>
+            <svg
+              id="sendResetSpinnerIcon"
+              class="hidden w-4 h-4 animate-spin"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"></path>
             </svg>
             <span id="sendResetBtnText">Send Reset Code</span>
           </button>
@@ -485,8 +559,18 @@ $conn->close();
           <button id="codeCancelBtn" class="flex-1 py-2.5 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors rounded-[3px]">
             Cancel
           </button>
-          <button id="codeVerifyBtn" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors rounded-[3px]">
-            Verify Code
+          <button id="codeVerifyBtn" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-70 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 rounded-[3px]">
+            <svg
+              id="codeVerifySpinnerIcon"
+              class="hidden w-4 h-4 animate-spin"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"></path>
+            </svg>
+            <span id="codeVerifyBtnText">Verify Code</span>
           </button>
         </div>
       </div>
@@ -531,7 +615,7 @@ $conn->close();
               <input
                 type="password"
                 id="newPasswordInput"
-                placeholder="At least 8 characters"
+                placeholder="Enter your new password"
                 class="w-full pl-10 pr-9 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600 rounded-[3px]"
               />
               <button
@@ -562,6 +646,9 @@ $conn->close();
                 </svg>
               </button>
             </div>
+            <p class="text-[10px] text-gray-400 mt-1.5">
+              At least 8 characters, with an uppercase letter, a number, and a symbol.
+            </p>
             <div class="flex items-center gap-1.5 mt-2" id="strengthBarWrapper">
               <div class="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
                 <div id="strengthBar1" class="strength-bar h-full w-0 bg-gray-200"></div>
@@ -571,6 +658,9 @@ $conn->close();
               </div>
               <div class="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
                 <div id="strengthBar3" class="strength-bar h-full w-0 bg-gray-200"></div>
+              </div>
+              <div class="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
+                <div id="strengthBar4" class="strength-bar h-full w-0 bg-gray-200"></div>
               </div>
               <span id="strengthLabel" class="text-[10px] font-semibold text-gray-400 w-10 text-right shrink-0"></span>
             </div>
@@ -662,6 +752,8 @@ $conn->close();
       const emailInput = document.getElementById("emailInput");
       const sendResetBtn = document.getElementById("sendResetBtn");
       const sendResetBtnText = document.getElementById("sendResetBtnText");
+      const sendResetDefaultIcon = document.getElementById("sendResetDefaultIcon");
+      const sendResetSpinnerIcon = document.getElementById("sendResetSpinnerIcon");
       const errorBanner = document.getElementById("errorBanner");
       const errorText = document.getElementById("errorText");
       const successBanner = document.getElementById("successBanner");
@@ -669,6 +761,13 @@ $conn->close();
 
       let verifiedEmail = "";
       let verifiedCode = "";
+
+      function setSendResetLoading(isLoading) {
+        sendResetBtn.disabled = isLoading;
+        sendResetBtnText.textContent = isLoading ? "Sending..." : "Send Reset Code";
+        sendResetDefaultIcon.classList.toggle("hidden", isLoading);
+        sendResetSpinnerIcon.classList.toggle("hidden", !isLoading);
+      }
 
       async function postAction(action, data = {}) {
         const formData = new FormData();
@@ -708,6 +807,15 @@ $conn->close();
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
       }
 
+      function isStrongPassword(val) {
+        return (
+          val.length >= 8 &&
+          /[A-Z]/.test(val) &&
+          /[0-9]/.test(val) &&
+          /[^A-Za-z0-9]/.test(val)
+        );
+      }
+
       async function requestCode() {
         const email = emailInput.value.trim();
 
@@ -717,13 +825,11 @@ $conn->close();
         }
 
         hideFormBanners();
-        sendResetBtn.disabled = true;
-        sendResetBtnText.textContent = "Sending...";
+        setSendResetLoading(true);
 
         const res = await postAction("send_code", { email });
 
-        sendResetBtn.disabled = false;
-        sendResetBtnText.textContent = "Send Reset Code";
+        setSendResetLoading(false);
 
         if (!res.success) {
           showFormError(res.message || "Something went wrong. Please try again.");
@@ -762,6 +868,30 @@ $conn->close();
         });
       }
 
+      const RESEND_COOLDOWN_SECONDS = 30;
+      const RESEND_BTN_DEFAULT_TEXT = "Resend it";
+      let resendCooldownInterval = null;
+
+      function startResendCooldown(seconds) {
+        let remaining = seconds;
+        resendCodeBtn.disabled = true;
+        resendCodeBtn.textContent = `Resend in ${remaining}s`;
+
+        if (resendCooldownInterval) clearInterval(resendCooldownInterval);
+
+        resendCooldownInterval = setInterval(() => {
+          remaining--;
+          if (remaining <= 0) {
+            clearInterval(resendCooldownInterval);
+            resendCooldownInterval = null;
+            resendCodeBtn.disabled = false;
+            resendCodeBtn.textContent = RESEND_BTN_DEFAULT_TEXT;
+          } else {
+            resendCodeBtn.textContent = `Resend in ${remaining}s`;
+          }
+        }, 1000);
+      }
+
       function openCodeModal(email) {
         verifiedEmail = email;
         codeModalEmail.textContent = email;
@@ -773,6 +903,7 @@ $conn->close();
         codeModal.classList.remove("hidden");
         document.body.style.overflow = "hidden";
         setTimeout(() => codeBoxes[0].focus(), 100);
+        startResendCooldown(RESEND_COOLDOWN_SECONDS);
       }
 
       function closeCodeModal() {
@@ -822,6 +953,15 @@ $conn->close();
         });
       });
 
+      const codeVerifyBtnText = document.getElementById("codeVerifyBtnText");
+      const codeVerifySpinnerIcon = document.getElementById("codeVerifySpinnerIcon");
+
+      function setVerifyLoading(isLoading) {
+        codeVerifyBtn.disabled = isLoading;
+        codeVerifyBtnText.textContent = isLoading ? "Verifying..." : "Verify Code";
+        codeVerifySpinnerIcon.classList.toggle("hidden", !isLoading);
+      }
+
       codeVerifyBtn.addEventListener("click", async () => {
         const code = getCodeValue();
 
@@ -830,12 +970,21 @@ $conn->close();
           return;
         }
 
-        codeVerifyBtn.disabled = true;
+        setVerifyLoading(true);
         const res = await postAction("verify_code", { email: verifiedEmail, code });
-        codeVerifyBtn.disabled = false;
+        setVerifyLoading(false);
 
         if (!res.success) {
-          showCodeError(res.message || "Invalid or expired code. Please try again.");
+          if (res.locked) {
+            showCodeError(res.message || "Too many incorrect attempts. Please request a new code.");
+            codeVerifyBtn.disabled = true;
+            codeBoxes.forEach((box) => (box.disabled = true));
+          } else if (res.attempts_left !== undefined) {
+            const attemptWord = res.attempts_left === 1 ? "attempt" : "attempts";
+            showCodeError((res.message || "Invalid or expired code.") + " (" + res.attempts_left + " " + attemptWord + " left)");
+          } else {
+            showCodeError(res.message || "Invalid or expired code. Please try again.");
+          }
           return;
         }
 
@@ -846,14 +995,23 @@ $conn->close();
 
       resendCodeBtn.addEventListener("click", async () => {
         resendCodeBtn.disabled = true;
-        await postAction("send_code", { email: verifiedEmail });
-        resendCodeBtn.disabled = false;
+        const res = await postAction("send_code", { email: verifiedEmail });
+
+        if (!res.success) {
+          showCodeError(res.message || "Please wait before requesting a new code.");
+          startResendCooldown(res.wait_seconds || RESEND_COOLDOWN_SECONDS);
+          return;
+        }
+
         clearCodeBoxes();
         codeError.classList.add("hidden");
         codeError.classList.remove("flex");
+        codeVerifyBtn.disabled = false;
+        codeBoxes.forEach((box) => (box.disabled = false));
         resendConfirmText.classList.remove("hidden");
         resendConfirmText.classList.add("flex");
         codeBoxes[0].focus();
+        startResendCooldown(res.wait_seconds || RESEND_COOLDOWN_SECONDS);
       });
 
       const newPasswordModal = document.getElementById("newPasswordModal");
@@ -865,6 +1023,7 @@ $conn->close();
       const strengthBar1 = document.getElementById("strengthBar1");
       const strengthBar2 = document.getElementById("strengthBar2");
       const strengthBar3 = document.getElementById("strengthBar3");
+      const strengthBar4 = document.getElementById("strengthBar4");
       const strengthLabel = document.getElementById("strengthLabel");
 
       function calculatePasswordStrength(password) {
@@ -872,19 +1031,19 @@ $conn->close();
 
         let score = 0;
         if (password.length >= 8) score++;
-        if (password.length >= 12) score++;
-        if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
-        if (/\d/.test(password)) score++;
-        if (/[^a-zA-Z0-9]/.test(password)) score++;
+        if (/[A-Z]/.test(password)) score++;
+        if (/[0-9]/.test(password)) score++;
+        if (/[^A-Za-z0-9]/.test(password)) score++;
 
         if (score <= 1) return { level: 1, label: "Weak", color: "bg-red-400", labelColor: "text-red-500" };
-        if (score <= 3) return { level: 2, label: "Fair", color: "bg-amber-400", labelColor: "text-amber-500" };
-        return { level: 3, label: "Strong", color: "bg-emerald-500", labelColor: "text-emerald-600" };
+        if (score === 2) return { level: 2, label: "Fair", color: "bg-amber-400", labelColor: "text-amber-500" };
+        if (score === 3) return { level: 3, label: "Good", color: "bg-emerald-500", labelColor: "text-emerald-600" };
+        return { level: 4, label: "Strong", color: "bg-emerald-700", labelColor: "text-emerald-700" };
       }
 
       function updateStrengthBar() {
         const result = calculatePasswordStrength(newPasswordInput.value);
-        const bars = [strengthBar1, strengthBar2, strengthBar3];
+        const bars = [strengthBar1, strengthBar2, strengthBar3, strengthBar4];
 
         bars.forEach((bar, i) => {
           bar.className = i < result.level
@@ -912,10 +1071,10 @@ $conn->close();
         passwordMatchText.classList.remove("hidden");
 
         if (password === confirmPassword) {
-          passwordMatchText.textContent = "✓ Passwords match";
+          passwordMatchText.textContent = "Passwords match";
           passwordMatchText.className = "text-[10px] font-medium mt-1.5 text-emerald-600";
         } else {
-          passwordMatchText.textContent = "✕ Passwords do not match";
+          passwordMatchText.textContent = "Passwords do not match";
           passwordMatchText.className = "text-[10px] font-medium mt-1.5 text-red-500";
         }
       }
@@ -971,8 +1130,8 @@ $conn->close();
         newPasswordError.classList.add("hidden");
         newPasswordError.classList.remove("flex");
 
-        if (!newPassword || newPassword.length < 8) {
-          showNewPasswordError("Password must be at least 8 characters.");
+        if (!isStrongPassword(newPassword)) {
+          showNewPasswordError("Password must be at least 8 characters and include an uppercase letter, a number, and a symbol.");
           return;
         }
 

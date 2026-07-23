@@ -98,12 +98,72 @@ function deleteCustomerProfileImage($dbRelativePath)
 function emailTakenByOther($conn, $email, $excludeCustomerId = 0)
 {
   if ($email === '' || $email === null) return false;
+
+  $stmt = $conn->prepare("SELECT admin_id FROM admin WHERE email = ? LIMIT 1");
+  $stmt->bind_param("s", $email);
+  $stmt->execute();
+  $row = $stmt->get_result()->fetch_assoc();
+  $stmt->close();
+  if ($row) return true;
+
+  $stmt = $conn->prepare("SELECT owner_id FROM stall_owners WHERE email = ? LIMIT 1");
+  $stmt->bind_param("s", $email);
+  $stmt->execute();
+  $row = $stmt->get_result()->fetch_assoc();
+  $stmt->close();
+  if ($row) return true;
+
+  $stmt = $conn->prepare("SELECT staff_id FROM delivery_staff WHERE email = ? LIMIT 1");
+  $stmt->bind_param("s", $email);
+  $stmt->execute();
+  $row = $stmt->get_result()->fetch_assoc();
+  $stmt->close();
+  if ($row) return true;
+
   $stmt = $conn->prepare("SELECT customer_id FROM customers WHERE email = ? AND customer_id != ? LIMIT 1");
   $stmt->bind_param("si", $email, $excludeCustomerId);
   $stmt->execute();
   $row = $stmt->get_result()->fetch_assoc();
   $stmt->close();
+  if ($row) return true;
+
+  return false;
+}
+
+function idNumberTakenByOther($conn, $idNumber, $excludeCustomerId = 0)
+{
+  if ($idNumber === '' || $idNumber === null) return false;
+  $stmt = $conn->prepare("SELECT customer_id FROM customers WHERE id_number = ? AND customer_id != ? LIMIT 1");
+  $stmt->bind_param("si", $idNumber, $excludeCustomerId);
+  $stmt->execute();
+  $row = $stmt->get_result()->fetch_assoc();
+  $stmt->close();
   return (bool) $row;
+}
+
+function isStrongPassword($password)
+{
+  if (strlen($password) < 8) return false;
+  if (!preg_match('/[A-Z]/', $password)) return false;
+  if (!preg_match('/[0-9]/', $password)) return false;
+  if (!preg_match('/[^A-Za-z0-9]/', $password)) return false;
+  return true;
+}
+
+function toTitleCase($str)
+{
+  $str = preg_replace('/\s+/', ' ', trim($str));
+  if ($str === '') {
+    return '';
+  }
+  $str = mb_strtolower($str, 'UTF-8');
+  return preg_replace_callback(
+    "/(^|[\s'\-])(\p{L})/u",
+    function ($m) {
+      return $m[1] . mb_strtoupper($m[2], 'UTF-8');
+    },
+    $str
+  );
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
@@ -111,22 +171,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
   $action = $_POST['action'];
 
   if ($action === 'add_customer') {
-    $firstName = trim($_POST['first_name'] ?? '');
-    $lastName  = trim($_POST['last_name'] ?? '');
+    $firstName = toTitleCase(trim($_POST['first_name'] ?? ''));
+    $lastName  = toTitleCase(trim($_POST['last_name'] ?? ''));
     $contact   = trim($_POST['contact_number'] ?? '');
-    $email     = trim($_POST['email'] ?? '');
+    $email     = strtolower(preg_replace('/\s+/', '', $_POST['email'] ?? ''));
     $idNumber  = trim($_POST['id_number'] ?? '');
     $password  = trim($_POST['password'] ?? '');
     $custType  = $_POST['customer_type'] ?? 'student';
     $status    = ($_POST['status'] ?? 'active') === 'inactive' ? 'inactive' : 'active';
+    $imageData = $_POST['profile_image_data'] ?? '';
 
     global $ALLOWED_CUSTOMER_TYPES;
     if (!in_array($custType, $ALLOWED_CUSTOMER_TYPES, true)) {
       $custType = 'student';
     }
 
-    if ($firstName === '' || $lastName === '' || $contact === '' || $email === '' || $password === '') {
+    if ($firstName === '' && $lastName === '' && $password === '') {
       echo json_encode(['success' => false, 'message' => 'Please fill in all required fields.']);
+      $conn->close();
+      exit;
+    }
+
+    if ($firstName === '') {
+      echo json_encode(['success' => false, 'message' => 'Please enter a first name.']);
+      $conn->close();
+      exit;
+    }
+
+    if (!preg_match("/^[\p{L}\s'\-]+$/u", $firstName)) {
+      echo json_encode(['success' => false, 'message' => 'First name can only contain letters.']);
+      $conn->close();
+      exit;
+    }
+
+    if ($lastName === '') {
+      echo json_encode(['success' => false, 'message' => 'Please enter a last name.']);
+      $conn->close();
+      exit;
+    }
+
+    if (!preg_match("/^[\p{L}\s'\-]+$/u", $lastName)) {
+      echo json_encode(['success' => false, 'message' => 'Last name can only contain letters.']);
       $conn->close();
       exit;
     }
@@ -137,28 +222,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
 
+    if ($custType !== 'outsider' && !preg_match('/^[0-9-]+$/', $idNumber)) {
+      echo json_encode(['success' => false, 'message' => 'ID number can only contain numbers and hyphens.']);
+      $conn->close();
+      exit;
+    }
+
     if ($custType === 'outsider') {
       $idNumber = '';
     }
 
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    if ($idNumber !== '' && idNumberTakenByOther($conn, $idNumber)) {
+      echo json_encode(['success' => false, 'message' => 'This ID number is already registered.']);
+      $conn->close();
+      exit;
+    }
+
+    if ($password === '') {
+      echo json_encode(['success' => false, 'message' => 'Please enter a password.']);
+      $conn->close();
+      exit;
+    }
+
+    if (!isStrongPassword($password)) {
+      echo json_encode(['success' => false, 'message' => 'Password must be at least 8 characters and include an uppercase letter, a number, and a symbol.']);
+      $conn->close();
+      exit;
+    }
+
+    if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
       echo json_encode(['success' => false, 'message' => 'Please enter a valid email address.']);
       $conn->close();
       exit;
     }
 
-    if (emailTakenByOther($conn, $email)) {
+    if ($email !== '' && emailTakenByOther($conn, $email)) {
       echo json_encode(['success' => false, 'message' => 'This email address is already in use.']);
       $conn->close();
       exit;
     }
 
-    $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-    $emailToSave = $email;
+    $profileImagePath = null;
+    if (strpos($imageData, 'data:image') === 0) {
+      $profileImagePath = saveCustomerProfileImage($imageData);
+    }
+
+    $emailToSave = $email !== '' ? $email : null;
     $idNumberToSave = $idNumber !== '' ? $idNumber : null;
 
-    $stmt = $conn->prepare("INSERT INTO customers (id_number, first_name, last_name, contact_number, email, password, customer_type, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("ssssssss", $idNumberToSave, $firstName, $lastName, $contact, $emailToSave, $hashedPassword, $custType, $status);
+    $stmt = $conn->prepare("INSERT INTO customers (profile_image, id_number, first_name, last_name, contact_number, email, password, customer_type, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("sssssssss", $profileImagePath, $idNumberToSave, $firstName, $lastName, $contact, $emailToSave, $password, $custType, $status);
     $ok = $stmt->execute();
     $stmt->close();
 
@@ -171,10 +284,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
   if ($action === 'edit_customer') {
     $customerId = (int) ($_POST['customer_id'] ?? 0);
-    $firstName  = trim($_POST['first_name'] ?? '');
-    $lastName   = trim($_POST['last_name'] ?? '');
+    $firstName  = toTitleCase(trim($_POST['first_name'] ?? ''));
+    $lastName   = toTitleCase(trim($_POST['last_name'] ?? ''));
     $contact    = trim($_POST['contact_number'] ?? '');
-    $email      = trim($_POST['email'] ?? '');
+    $email      = strtolower(preg_replace('/\s+/', '', $_POST['email'] ?? ''));
     $idNumber   = trim($_POST['id_number'] ?? '');
     $password   = trim($_POST['password'] ?? '');
     $custType   = $_POST['customer_type'] ?? 'student';
@@ -187,8 +300,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       $custType = 'student';
     }
 
-    if ($customerId <= 0 || $firstName === '' || $lastName === '' || $contact === '' || $email === '') {
+    if ($customerId <= 0) {
+      echo json_encode(['success' => false, 'message' => 'Invalid customer.']);
+      $conn->close();
+      exit;
+    }
+
+    if ($firstName === '' && $lastName === '') {
       echo json_encode(['success' => false, 'message' => 'Please fill in all required fields.']);
+      $conn->close();
+      exit;
+    }
+
+    if ($firstName === '') {
+      echo json_encode(['success' => false, 'message' => 'Please enter a first name.']);
+      $conn->close();
+      exit;
+    }
+
+    if (!preg_match("/^[\p{L}\s'\-]+$/u", $firstName)) {
+      echo json_encode(['success' => false, 'message' => 'First name can only contain letters.']);
+      $conn->close();
+      exit;
+    }
+
+    if ($lastName === '') {
+      echo json_encode(['success' => false, 'message' => 'Please enter a last name.']);
+      $conn->close();
+      exit;
+    }
+
+    if (!preg_match("/^[\p{L}\s'\-]+$/u", $lastName)) {
+      echo json_encode(['success' => false, 'message' => 'Last name can only contain letters.']);
       $conn->close();
       exit;
     }
@@ -199,17 +342,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
 
+    if ($custType !== 'outsider' && !preg_match('/^[0-9-]+$/', $idNumber)) {
+      echo json_encode(['success' => false, 'message' => 'ID number can only contain numbers and hyphens.']);
+      $conn->close();
+      exit;
+    }
+
     if ($custType === 'outsider') {
       $idNumber = '';
     }
 
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    if ($idNumber !== '' && idNumberTakenByOther($conn, $idNumber, $customerId)) {
+      echo json_encode(['success' => false, 'message' => 'This ID number is already registered.']);
+      $conn->close();
+      exit;
+    }
+
+    if ($password !== '' && !isStrongPassword($password)) {
+      echo json_encode(['success' => false, 'message' => 'Password must be at least 8 characters and include an uppercase letter, a number, and a symbol.']);
+      $conn->close();
+      exit;
+    }
+
+    if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
       echo json_encode(['success' => false, 'message' => 'Please enter a valid email address.']);
       $conn->close();
       exit;
     }
 
-    if (emailTakenByOther($conn, $email, $customerId)) {
+    if ($email !== '' && emailTakenByOther($conn, $email, $customerId)) {
       echo json_encode(['success' => false, 'message' => 'This email address is already in use.']);
       $conn->close();
       exit;
@@ -239,10 +400,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     $passwordToSave = $existing['password'];
     if ($password !== '') {
-      $passwordToSave = password_hash($password, PASSWORD_DEFAULT);
+      $passwordToSave = $password;
     }
 
-    $emailToSave = $email;
+    $emailToSave = $email !== '' ? $email : null;
     $idNumberToSave = $idNumber !== '' ? $idNumber : null;
 
     $stmt = $conn->prepare("UPDATE customers SET profile_image = ?, id_number = ?, first_name = ?, last_name = ?, contact_number = ?, email = ?, password = ?, customer_type = ?, status = ? WHERE customer_id = ?");
@@ -953,13 +1114,13 @@ $conn->close();
               <span class="text-xs font-medium text-gray-700">Active</span>
             </label>
             <label
-              class="flex items-center gap-2 p-2.5 flex-1 border border-gray-200 cursor-pointer hover:border-emerald-500 transition-all has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50/40"
+              class="flex items-center gap-2 p-2.5 flex-1 border border-gray-200 cursor-pointer hover:border-red-400 transition-all has-[:checked]:border-red-400 has-[:checked]:bg-red-50/40"
               style="border-radius: 3px">
               <input
                 type="radio"
                 name="customerStatus"
                 value="inactive"
-                class="accent-emerald-600 shrink-0" />
+                class="accent-red-500 shrink-0" />
               <span class="text-xs font-medium text-gray-700">Inactive</span>
             </label>
           </div>
@@ -1124,6 +1285,35 @@ $conn->close();
       return ((first[0] || "") + (last[0] || "")).toUpperCase();
     }
 
+    function isValidEmail(val) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+    }
+
+    function toTitleCase(str) {
+      return str
+        .trim()
+        .replace(/\s+/g, " ")
+        .toLowerCase()
+        .replace(/(^|[\s'-])\p{L}/gu, (c) => c.toUpperCase());
+    }
+
+    function isValidName(val) {
+      return /^[\p{L}\s'-]+$/u.test(val);
+    }
+
+    function isValidIdNumber(val) {
+      return /^[\d-]+$/.test(val);
+    }
+
+    function isStrongPassword(val) {
+      return (
+        val.length >= 8 &&
+        /[A-Z]/.test(val) &&
+        /[0-9]/.test(val) &&
+        /[^A-Za-z0-9]/.test(val)
+      );
+    }
+
     function displayOrDash(val) {
       const v = (val || "").toString().trim();
       return v === "" ? "–" : escapeHtml(v);
@@ -1262,14 +1452,16 @@ $conn->close();
       document.getElementById("fieldEmail").value = "";
       document.getElementById("fieldPassword").value = "";
       document.getElementById("fieldPassword").placeholder = "Enter password";
-      document.getElementById("passwordHint").textContent = "";
+      document.getElementById("passwordHint").textContent = "Must include uppercase, a number, and a symbol.";
       document.querySelector("input[name='customerType'][value='student']").checked = true;
       document.querySelector("input[name='customerStatus'][value='active']").checked = true;
       toggleIdNumberField();
       document.getElementById("customerFormError").classList.add("hidden");
       document.getElementById("customerFormError").classList.remove("flex");
-      document.getElementById("profileImageSection").classList.add("hidden");
-      document.getElementById("profileImageSection").classList.remove("flex");
+      document.getElementById("profileImageInput").value = "";
+      document.getElementById("profileImageSection").classList.remove("hidden");
+      document.getElementById("profileImageSection").classList.add("flex");
+      updateProfilePreview(null, "?");
       resetPasswordMeter();
       document.getElementById("customerModal").classList.remove("hidden");
       document.body.style.overflow = "hidden";
@@ -1340,8 +1532,40 @@ $conn->close();
 
       const isEditing = !!editingCustomerId;
 
-      if (!firstName || !lastName || !contact || !email || (!isEditing && !password)) {
+      const allCoreBlank = isEditing
+        ? (!firstName && !lastName)
+        : (!firstName && !lastName && !password);
+
+      if (allCoreBlank) {
         errMsg.textContent = "Please fill in all required fields.";
+        errEl.classList.remove("hidden");
+        errEl.classList.add("flex");
+        return;
+      }
+
+      if (!firstName) {
+        errMsg.textContent = "Please enter a first name.";
+        errEl.classList.remove("hidden");
+        errEl.classList.add("flex");
+        return;
+      }
+
+      if (!isValidName(firstName)) {
+        errMsg.textContent = "First name can only contain letters.";
+        errEl.classList.remove("hidden");
+        errEl.classList.add("flex");
+        return;
+      }
+
+      if (!lastName) {
+        errMsg.textContent = "Please enter a last name.";
+        errEl.classList.remove("hidden");
+        errEl.classList.add("flex");
+        return;
+      }
+
+      if (!isValidName(lastName)) {
+        errMsg.textContent = "Last name can only contain letters.";
         errEl.classList.remove("hidden");
         errEl.classList.add("flex");
         return;
@@ -1353,10 +1577,38 @@ $conn->close();
         errEl.classList.add("flex");
         return;
       }
+
+      if (customerType !== "outsider" && !isValidIdNumber(idNumber)) {
+        errMsg.textContent = "ID number can only contain numbers and hyphens.";
+        errEl.classList.remove("hidden");
+        errEl.classList.add("flex");
+        return;
+      }
+
+      if (!isEditing && !password) {
+        errMsg.textContent = "Please enter a password.";
+        errEl.classList.remove("hidden");
+        errEl.classList.add("flex");
+        return;
+      }
+
+      if (password && !isStrongPassword(password)) {
+        errMsg.textContent = "Password must be at least 8 characters and include an uppercase letter, a number, and a symbol.";
+        errEl.classList.remove("hidden");
+        errEl.classList.add("flex");
+        return;
+      }
+
+      if (email && !isValidEmail(email)) {
+        errMsg.textContent = "Please enter a valid email address.";
+        errEl.classList.remove("hidden");
+        errEl.classList.add("flex");
+        return;
+      }
       errEl.classList.add("hidden");
       errEl.classList.remove("flex");
 
-      const isNewUpload = isEditing && typeof currentProfileImage === "string" && currentProfileImage.startsWith("data:image");
+      const isNewUpload = typeof currentProfileImage === "string" && currentProfileImage.startsWith("data:image");
 
       const payload = {
         first_name: firstName,
@@ -1367,10 +1619,10 @@ $conn->close();
         password: password,
         customer_type: customerType,
         status: status,
+        profile_image_data: isNewUpload ? currentProfileImage : "",
       };
 
       if (isEditing) {
-        payload.profile_image_data = isNewUpload ? currentProfileImage : "";
         payload.remove_image = removeImageFlag ? "1" : "0";
       }
 
@@ -1516,6 +1768,53 @@ $conn->close();
             document.getElementById("fieldFirstName").value.trim() || "?",
             document.getElementById("fieldLastName").value.trim() || "",
           ) || "?";
+      });
+
+      [document.getElementById("fieldFirstName"), document.getElementById("fieldLastName")].forEach((el) => {
+        el.addEventListener("input", () => {
+          const cursorPos = el.selectionStart;
+          const cleaned = el.value.replace(/[^\p{L}\s'-]/gu, "");
+          if (cleaned !== el.value) {
+            const removedCount = el.value.length - cleaned.length;
+            el.value = cleaned;
+            const newPos = Math.max(0, cursorPos - removedCount);
+            el.setSelectionRange(newPos, newPos);
+          }
+        });
+
+        el.addEventListener("blur", () => {
+          if (el.value.trim()) {
+            el.value = toTitleCase(el.value);
+          }
+        });
+      });
+
+      document.getElementById("fieldIdNumber").addEventListener("input", (e) => {
+        const cursorPos = e.target.selectionStart;
+        const cleaned = e.target.value.replace(/[^\d-]/g, "");
+        if (cleaned !== e.target.value) {
+          const removedCount = e.target.value.length - cleaned.length;
+          e.target.value = cleaned;
+          const newPos = Math.max(0, cursorPos - removedCount);
+          e.target.setSelectionRange(newPos, newPos);
+        }
+      });
+
+      document.getElementById("fieldEmail").addEventListener("input", (e) => {
+        const cursorPos = e.target.selectionStart;
+        const cleaned = e.target.value.replace(/\s/g, "");
+        if (cleaned !== e.target.value) {
+          const removedCount = e.target.value.length - cleaned.length;
+          e.target.value = cleaned;
+          const newPos = Math.max(0, cursorPos - removedCount);
+          e.target.setSelectionRange(newPos, newPos);
+        }
+      });
+
+      document.getElementById("fieldEmail").addEventListener("blur", (e) => {
+        if (e.target.value.trim()) {
+          e.target.value = e.target.value.trim().toLowerCase();
+        }
       });
 
       document.getElementById("togglePasswordBtn").addEventListener("click", () => {

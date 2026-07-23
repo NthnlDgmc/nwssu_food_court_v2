@@ -15,23 +15,6 @@
 
     * {
       font-family: "Poppins", sans-serif;
-      border-radius: 3px !important;
-    }
-
-    .stall-card {
-      border-radius: 6px !important;
-    }
-
-    .topbar-btn {
-      border-radius: 10px !important;
-    }
-
-    .avatar-circle {
-      border-radius: 50% !important;
-    }
-
-    .pill {
-      border-radius: 999px !important;
     }
 
     body {
@@ -69,6 +52,7 @@
         position: fixed;
         inset: 0;
         height: 100vh;
+        height: 100dvh;
         z-index: 30;
         background: #ffffff;
       }
@@ -78,12 +62,12 @@
 
 <body class="bg-white">
   <div class="flex flex-col h-screen">
-    <div class="bg-white flex-shrink-0 fixed top-0 left-0 right-0 z-20 border-b border-gray-100">
-      <div class="max-w-6xl mx-auto px-4 py-2 grid grid-cols-3 items-center">
+    <div class="bg-white flex-shrink-0 fixed top-0 left-0 right-0 z-20">
+      <div class="max-w-5xl mx-auto px-4 py-2 grid grid-cols-3 items-center">
         <button
           id="backButton"
-          class="topbar-btn p-1.5 bg-white border border-slate-200 hover:border-emerald-500 hover:bg-slate-50 transition-all justify-self-start flex items-center justify-center shrink-0"
-          style="width: 34px; height: 34px">
+          class="p-1.5 bg-white border border-gray-200 hover:border-emerald-500 hover:bg-slate-50 transition-all justify-self-start flex items-center justify-center shrink-0"
+          style="width: 34px; height: 34px; border-radius: 6px">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
@@ -105,89 +89,93 @@
     </div>
 
     <div class="flex-1 overflow-hidden mt-12 mb-16" id="mainContent">
-      <div class="max-w-6xl mx-auto h-full flex flex-col lg:flex-row">
+      <div class="max-w-5xl mx-auto h-full flex flex-col lg:flex-row">
         <div
           id="chatListPanel"
-          class="w-full lg:w-[340px] lg:border-r lg:border-gray-200 flex flex-col h-full shrink-0">
-          <div class="p-4 shrink-0">
-            <div class="relative">
-              <input
-                type="text"
-                id="searchConversations"
-                placeholder="Search conversations..."
-                class="w-full pl-9 pr-9 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600"
-                style="border-radius: 3px" />
-              <div class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-                </svg>
+          class="w-full lg:w-[340px] lg:border-r lg:border-gray-200 flex flex-col h-full shrink-0 px-4 pt-3 pb-4">
+          <div class="bg-white border border-gray-200 shadow-sm rounded-md flex flex-col flex-1 min-h-0 overflow-hidden">
+            <div class="p-3 border-b border-gray-100 shrink-0">
+              <div class="relative">
+                <input
+                  type="text"
+                  id="searchConversations"
+                  placeholder="Search conversations..."
+                  class="w-full pl-9 pr-9 py-2 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600"
+                  style="border-radius: 3px" />
+                <div class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                  </svg>
+                </div>
+                <button
+                  type="button"
+                  id="clearSearchBtn"
+                  class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-600 transition-colors"
+                  style="border-radius: 3px">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-              <button
-                type="button"
-                id="clearSearchBtn"
-                class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-600 transition-colors"
-                style="border-radius: 3px">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-                </svg>
-              </button>
             </div>
-          </div>
-          <div class="flex-1 overflow-y-auto scroll-area" id="conversationList"></div>
-          <div id="conversationEmpty" class="hidden flex-1 flex flex-col items-center justify-center text-center px-4">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-10 h-10 text-gray-300 mb-2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-            </svg>
-            <p class="text-sm font-semibold text-gray-500">No conversations found</p>
-            <p class="text-xs text-gray-400 mt-0.5">Try a different search</p>
+            <div class="flex-1 overflow-y-auto scroll-area" id="conversationList"></div>
+            <div id="conversationEmpty" class="hidden flex-1 flex-col items-center justify-center text-center px-4">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-10 h-10 text-gray-300 mb-2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+              </svg>
+              <p class="text-sm font-semibold text-gray-500">No conversations found</p>
+              <p class="text-xs text-gray-400 mt-0.5">Try a different search</p>
+            </div>
           </div>
         </div>
 
         <div
           id="chatThreadPanel"
-          class="mobile-hide w-full flex-1 flex flex-col h-full">
-          <div class="border-b border-gray-100 p-3 flex items-center gap-3 shrink-0">
-            <button id="backToListBtn" class="lg:hidden p-1.5 hover:bg-gray-100 transition-colors shrink-0" style="border-radius: 3px">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-600">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-              </svg>
-            </button>
-            <div id="threadAvatar" class="w-9 h-9 flex items-center justify-center text-white text-xs font-bold shrink-0 avatar-circle"></div>
-            <div class="flex-1 min-w-0">
-              <p id="threadName" class="text-sm font-semibold text-gray-800 truncate"></p>
-              <span id="threadSubLabel" class="text-[10px] font-semibold px-1.5 py-0.5 border capitalize" style="border-radius: 3px"></span>
+          class="mobile-hide w-full flex-1 flex flex-col h-full lg:px-4 lg:pt-3 lg:pb-4">
+          <div class="flex flex-col h-full min-h-0 lg:bg-white lg:border lg:border-gray-200 lg:shadow-sm lg:rounded-md lg:overflow-hidden">
+            <div class="border-b border-gray-100 px-3 py-2.5 flex items-center gap-3 shrink-0">
+              <button id="backToListBtn" class="lg:hidden p-1.5 hover:bg-gray-100 transition-colors shrink-0" style="border-radius: 3px">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-600">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                </svg>
+              </button>
+              <div id="threadAvatar" class="w-8 h-8 flex items-center justify-center text-white text-xs font-bold shrink-0 rounded-full"></div>
+              <div class="flex-1 min-w-0">
+                <p id="threadName" class="text-sm font-semibold text-gray-800 truncate"></p>
+                <span id="threadSubLabel" class="text-[10px] font-semibold px-1.5 py-0.5 border capitalize inline-block mt-0.5" style="border-radius: 3px"></span>
+              </div>
+              <button id="callContactBtn" class="p-2 hover:bg-gray-100 transition-colors shrink-0" style="border-radius: 3px" title="Call">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-emerald-600">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z" />
+                </svg>
+              </button>
             </div>
-            <button id="callContactBtn" class="p-2 hover:bg-gray-100 transition-colors shrink-0" style="border-radius: 3px" title="Call">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-emerald-600">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z" />
-              </svg>
-            </button>
-          </div>
-          <div class="flex-1 overflow-y-auto scroll-area p-4 space-y-3" id="messagesContainer"></div>
-          <div class="border-t border-gray-100 p-3 flex items-center gap-2 shrink-0">
-            <input
-              type="text"
-              id="messageInput"
-              placeholder="Type a message..."
-              class="flex-1 px-3 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600"
-              style="border-radius: 3px" />
-            <button
-              id="sendMessageBtn"
-              class="w-9 h-9 bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center transition-colors shrink-0"
-              style="border-radius: 3px">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
-              </svg>
-            </button>
+            <div class="flex-1 overflow-y-auto scroll-area p-4 space-y-3" id="messagesContainer"></div>
+            <div class="border-t border-gray-100 p-3 flex items-center gap-2 shrink-0">
+              <input
+                type="text"
+                id="messageInput"
+                placeholder="Type a message..."
+                class="flex-1 px-3 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600"
+                style="border-radius: 3px" />
+              <button
+                id="sendMessageBtn"
+                class="w-9 h-9 bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center transition-colors shrink-0"
+                style="border-radius: 3px">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
     <div class="bg-white border-t border-gray-200 flex-shrink-0 fixed bottom-0 left-0 right-0 z-20">
-      <div class="max-w-6xl mx-auto px-4 flex justify-around py-2">
+      <div class="max-w-5xl mx-auto px-4 flex justify-around py-2">
         <a
-          href="./home.html"
+          href="./home.php"
           class="flex flex-col items-center justify-center py-2 px-3 transition-all duration-200 group text-gray-500 hover:text-gray-900 hover:bg-gray-50"
           style="border-radius: 3px">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 transition-transform group-hover:scale-110">
@@ -196,7 +184,7 @@
           <span class="text-xs font-medium mt-1">Home</span>
         </a>
         <a
-          href="./cart.html"
+          href="./cart.php"
           class="flex flex-col items-center justify-center py-2 px-3 transition-all duration-200 group text-gray-500 hover:text-gray-900 hover:bg-gray-50 relative"
           style="border-radius: 3px">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 transition-transform group-hover:scale-110">
@@ -205,7 +193,7 @@
           <span class="text-xs font-medium mt-1">Cart</span>
         </a>
         <a
-          href="./order.html"
+          href="./order.php"
           class="flex flex-col items-center justify-center py-2 px-3 transition-all duration-200 group text-gray-500 hover:text-gray-900 hover:bg-gray-50"
           style="border-radius: 3px">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 transition-transform group-hover:scale-110">
@@ -214,7 +202,7 @@
           <span class="text-xs font-medium mt-1">Orders</span>
         </a>
         <a
-          href="./chat.html"
+          href="./chat.php"
           class="flex flex-col items-center justify-center py-2 px-3 transition-all duration-200 group text-emerald-600 bg-emerald-50 relative"
           style="border-radius: 3px">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 transition-transform group-hover:scale-110">
@@ -223,7 +211,7 @@
           <span class="text-xs font-medium mt-1">Chats</span>
         </a>
         <a
-          href="./account.html"
+          href="./account.php"
           class="flex flex-col items-center justify-center py-2 px-3 transition-all duration-200 group text-gray-500 hover:text-gray-900 hover:bg-gray-50"
           style="border-radius: 3px">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 transition-transform group-hover:scale-110">
@@ -243,18 +231,18 @@
       },
       delivery: {
         badgeCls: "bg-blue-50 text-blue-700 border-blue-200",
-        avatarCls: "bg-gradient-to-br from-blue-500 to-blue-700"
+        avatarCls: "bg-gradient-to-br from-emerald-500 to-emerald-700"
       },
       admin: {
         badgeCls: "bg-purple-50 text-purple-700 border-purple-200",
-        avatarCls: "bg-gradient-to-br from-purple-500 to-purple-700"
+        avatarCls: "bg-gradient-to-br from-emerald-500 to-emerald-700"
       },
     };
 
     let conversations = [{
         id: "c1",
         type: "stall",
-        name: "Aling Tonya",
+        name: "Sheryl Caibog",
         subLabel: "Stall 1",
         phone: "+639123456789",
         unread: 1,
@@ -278,8 +266,8 @@
       {
         id: "c2",
         type: "stall",
-        name: "Mang Boy",
-        subLabel: "Stall 5",
+        name: "Rina Baga",
+        subLabel: "Stall 2",
         phone: "+639172345678",
         unread: 0,
         messages: [{
@@ -411,7 +399,7 @@
           const isActive = c.id === activeConversationId;
           return `
             <button class="conversation-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-100 ${isActive ? "bg-emerald-50/60" : ""}" data-id="${c.id}">
-              <div class="w-11 h-11 ${meta.avatarCls} flex items-center justify-center text-white text-xs font-bold shrink-0 avatar-circle">${getInitials(c.name)}</div>
+              <div class="w-11 h-11 ${meta.avatarCls} flex items-center justify-center text-white text-xs font-bold shrink-0 rounded-full">${getInitials(c.name)}</div>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center justify-between gap-2">
                   <div class="flex items-center gap-1.5 min-w-0">
@@ -442,12 +430,12 @@
 
       const avatarEl = document.getElementById("threadAvatar");
       avatarEl.textContent = getInitials(conv.name);
-      avatarEl.className = `w-9 h-9 ${meta.avatarCls} flex items-center justify-center text-white text-xs font-bold shrink-0 avatar-circle`;
+      avatarEl.className = `w-8 h-8 ${meta.avatarCls} flex items-center justify-center text-white text-xs font-bold shrink-0 rounded-full`;
 
       document.getElementById("threadName").textContent = conv.name;
       const badge = document.getElementById("threadSubLabel");
       badge.textContent = conv.subLabel;
-      badge.className = `text-[10px] font-semibold px-1.5 py-0.5 border ${meta.badgeCls}`;
+      badge.className = `text-[10px] font-semibold px-1.5 py-0.5 border inline-block mt-0.5 ${meta.badgeCls}`;
       badge.style.borderRadius = "3px";
 
       document.getElementById("callContactBtn").setAttribute("data-phone", conv.phone || "");

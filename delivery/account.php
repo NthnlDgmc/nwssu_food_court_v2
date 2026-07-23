@@ -251,8 +251,8 @@ if (!$initialProfile) {
       <div class="max-w-5xl mx-auto px-4 py-2 grid grid-cols-3 items-center">
         <button
           id="backButton"
-          class="rounded-md p-1.5 bg-white border border-slate-200 hover:border-emerald-500 hover:bg-slate-50 transition-all justify-self-start flex items-center justify-center shrink-0"
-          style="width: 34px; height: 34px">
+          class="p-1.5 bg-white border border-gray-200 hover:border-emerald-500 hover:bg-slate-50 transition-all justify-self-start flex items-center justify-center shrink-0"
+          style="width: 34px; height: 34px; border-radius: 6px">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             fill="none"

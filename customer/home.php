@@ -388,6 +388,17 @@ $avatarInitial = mb_strtoupper(mb_substr($firstName, 0, 1));
         transform: translateY(0);
       }
     }
+
+    #toast {
+      opacity: 0;
+      transform: translate(-50%, 8px);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+
+    #toast.toast-visible {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
   </style>
 </head>
 
@@ -420,8 +431,8 @@ $avatarInitial = mb_strtoupper(mb_substr($firstName, 0, 1));
           <div class="relative">
             <button
               id="notifBtn"
-              class="relative bg-white border border-slate-200 hover:border-emerald-500 hover:bg-slate-50 transition-all flex items-center justify-center shrink-0 rounded-md"
-              style="width: 34px; height: 34px"
+              class="relative bg-white border border-gray-200 hover:border-emerald-500 hover:bg-slate-50 transition-all flex items-center justify-center shrink-0"
+              style="width: 34px; height: 34px; border-radius: 6px"
               title="Notifications">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-600">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
@@ -441,8 +452,8 @@ $avatarInitial = mb_strtoupper(mb_substr($firstName, 0, 1));
           <a
             href="./favorites.php"
             id="headerFavoritesBtn"
-            class="relative bg-white border border-slate-200 hover:border-emerald-500 hover:bg-slate-50 transition-all flex items-center justify-center shrink-0 rounded-md"
-            style="width: 34px; height: 34px"
+            class="relative bg-white border border-gray-200 hover:border-emerald-500 hover:bg-slate-50 transition-all flex items-center justify-center shrink-0"
+            style="width: 34px; height: 34px; border-radius: 6px"
             title="Favorites">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-600">
               <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
@@ -696,6 +707,15 @@ $avatarInitial = mb_strtoupper(mb_substr($firstName, 0, 1));
 
   </div>
 
+  <div
+    id="toast"
+    class="hidden items-center gap-2 fixed left-1/2 bottom-20 z-40 -translate-x-1/2 max-w-[calc(100%-2rem)] bg-gray-900 text-white text-xs font-medium px-4 py-2.5 shadow-lg rounded-[6px]">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-emerald-400 shrink-0">
+      <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+    </svg>
+    <span id="toastMessage" class="truncate"></span>
+  </div>
+
   <script>
     const ALL_MENU_ITEMS = <?php echo json_encode($menuItems); ?>;
     const INITIAL_FAVORITE_IDS = <?php echo json_encode($favoriteMenuItemIds); ?>;
@@ -737,6 +757,35 @@ $avatarInitial = mb_strtoupper(mb_substr($firstName, 0, 1));
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+    }
+
+    let toastHideTimeout = null;
+    let toastRemoveTimeout = null;
+
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      const toastMessage = document.getElementById("toastMessage");
+      toastMessage.textContent = message;
+
+      if (toastHideTimeout) clearTimeout(toastHideTimeout);
+      if (toastRemoveTimeout) clearTimeout(toastRemoveTimeout);
+
+      toast.classList.remove("hidden");
+      toast.classList.add("flex");
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          toast.classList.add("toast-visible");
+        });
+      });
+
+      toastHideTimeout = setTimeout(() => {
+        toast.classList.remove("toast-visible");
+        toastRemoveTimeout = setTimeout(() => {
+          toast.classList.add("hidden");
+          toast.classList.remove("flex");
+        }, 250);
+      }, 2000);
     }
 
     async function postAction(action, data = {}) {
@@ -1050,6 +1099,11 @@ $avatarInitial = mb_strtoupper(mb_substr($firstName, 0, 1));
               if (res.success) {
                 this.classList.add("added-state");
                 this.innerHTML = ADD_BTN_ADDED_HTML;
+
+                const addedItem = ALL_MENU_ITEMS.find((it) => it.menu_item_id === parseInt(menuItemId));
+                const itemLabel = addedItem ? addedItem.item_name : "Item";
+                showToast(itemLabel + " added to cart");
+
                 setTimeout(() => {
                   this.innerHTML = ADD_BTN_DEFAULT_HTML;
                   this.classList.remove("added-state");

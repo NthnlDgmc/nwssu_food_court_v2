@@ -52,7 +52,7 @@
             Go Back
           </a>
           <a
-            href="../auth/login.php"
+            href="./auth/login.php"
             class="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors rounded-[3px]"
           >
             Go to Login

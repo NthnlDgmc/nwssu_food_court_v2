@@ -8,15 +8,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['remember_me'] ?? '') === '
 session_start();
 require_once '../config/database.php';
 
+define('MAX_LOGIN_ATTEMPTS', 5);
+define('LOGIN_LOCKOUT_SECONDS', 60);
+
+$pageLoadLockoutRemaining = 0;
+$existingLockoutUntil = $_SESSION['login_lockout_until'] ?? 0;
+if ($existingLockoutUntil > time()) {
+    $pageLoadLockoutRemaining = $existingLockoutUntil - time();
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
 
-    $username = trim($_POST['username'] ?? '');
+    $lockoutUntil = $_SESSION['login_lockout_until'] ?? 0;
+    if ($lockoutUntil > time()) {
+        $waitSeconds = $lockoutUntil - time();
+        echo json_encode([
+            'success' => false,
+            'message' => 'Too many failed attempts. Please wait ' . $waitSeconds . ' seconds before trying again.',
+            'locked' => true,
+            'wait_seconds' => $waitSeconds,
+        ]);
+        exit;
+    }
+
+    $username = strtolower(preg_replace('/\s+/', '', $_POST['username'] ?? ''));
     $password = trim($_POST['password'] ?? '');
 
     if ($username === '' || $password === '') {
         echo json_encode(['success' => false, 'message' => 'Please enter both your ID number/email and password.']);
         exit;
+    }
+
+    function registerFailedLoginAttempt()
+    {
+        $_SESSION['login_attempts'] = ($_SESSION['login_attempts'] ?? 0) + 1;
+        if ($_SESSION['login_attempts'] >= MAX_LOGIN_ATTEMPTS) {
+            $_SESSION['login_lockout_until'] = time() + LOGIN_LOCKOUT_SECONDS;
+            $_SESSION['login_attempts'] = 0;
+        }
     }
 
     $stmt = $conn->prepare("SELECT admin_id, password, first_name, last_name FROM admin WHERE email = ? LIMIT 1");
@@ -36,6 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             echo json_encode(['success' => true, 'redirect' => '../admin/dashboard.php']);
             exit;
         } else {
+            registerFailedLoginAttempt();
             echo json_encode(['success' => false, 'message' => 'Invalid ID number or password. Please try again.']);
             exit;
         }
@@ -59,6 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             echo json_encode(['success' => true, 'redirect' => '../stall/dashboard.php']);
             exit;
         } else {
+            registerFailedLoginAttempt();
             echo json_encode(['success' => false, 'message' => 'Invalid ID number or password. Please try again.']);
             exit;
         }
@@ -82,6 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             echo json_encode(['success' => true, 'redirect' => '../delivery/dashboard.php']);
             exit;
         } else {
+            registerFailedLoginAttempt();
             echo json_encode(['success' => false, 'message' => 'Invalid ID number or password. Please try again.']);
             exit;
         }
@@ -119,12 +152,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             exit;
         } else {
+            registerFailedLoginAttempt();
             echo json_encode(['success' => false, 'message' => 'Invalid ID number or password. Please try again.']);
             exit;
         }
     }
     $stmt->close();
 
+    registerFailedLoginAttempt();
     echo json_encode(['success' => false, 'message' => 'Invalid ID number or password. Please try again.']);
 
     $conn->close();
@@ -375,9 +410,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <button
             type="button"
             id="signInBtn"
-            class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 rounded-[3px]"
+            class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-70 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 rounded-[3px]"
           >
             <svg
+              id="signInArrowIcon"
               class="w-4 h-4"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
@@ -390,6 +426,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 stroke-linejoin="round"
                 d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9"
               />
+            </svg>
+            <svg
+              id="signInSpinnerIcon"
+              class="hidden w-4 h-4 animate-spin"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              ></circle>
+              <path
+                class="opacity-90"
+                fill="currentColor"
+                d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"
+              ></path>
             </svg>
             <span id="signInBtnText">Sign In</span>
           </button>
@@ -471,10 +528,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       const passwordInput = document.getElementById("passwordInput");
       const signInBtn = document.getElementById("signInBtn");
       const signInBtnText = document.getElementById("signInBtnText");
+      const signInArrowIcon = document.getElementById("signInArrowIcon");
+      const signInSpinnerIcon = document.getElementById("signInSpinnerIcon");
       const errorBanner = document.getElementById("errorBanner");
       const errorText = document.getElementById("errorText");
       const pwToggleBtn = document.getElementById("pwToggleBtn");
       const pwEyeIcon = document.getElementById("pwEyeIcon");
+
+      function setSignInLoading(isLoading) {
+        signInBtn.disabled = isLoading;
+        signInBtnText.textContent = isLoading ? "Signing in..." : "Sign In";
+        signInArrowIcon.classList.toggle("hidden", isLoading);
+        signInSpinnerIcon.classList.toggle("hidden", !isLoading);
+      }
 
       function showError(msg) {
         errorText.textContent = msg;
@@ -499,6 +565,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           : `<path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>`;
       });
 
+      let lockoutInterval = null;
+
+      function startLoginLockout(seconds) {
+        let remaining = seconds;
+        signInBtn.disabled = true;
+        signInBtnText.textContent = `Try again in ${remaining}s`;
+
+        if (lockoutInterval) clearInterval(lockoutInterval);
+
+        lockoutInterval = setInterval(() => {
+          remaining--;
+          if (remaining <= 0) {
+            clearInterval(lockoutInterval);
+            lockoutInterval = null;
+            signInBtn.disabled = false;
+            signInBtnText.textContent = "Sign In";
+            signInArrowIcon.classList.remove("hidden");
+            signInSpinnerIcon.classList.add("hidden");
+          } else {
+            signInBtnText.textContent = `Try again in ${remaining}s`;
+          }
+        }, 1000);
+      }
+
       async function handleSignIn() {
         const username = usernameInput.value.trim();
         const password = passwordInput.value;
@@ -509,8 +599,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         hideError();
-        signInBtn.disabled = true;
-        signInBtnText.textContent = "Signing in...";
+        setSignInLoading(true);
 
         try {
           const formData = new FormData();
@@ -529,13 +618,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             window.location.href = data.redirect;
           } else {
             showError(data.message || "Invalid ID number or password. Please try again.");
-            signInBtn.disabled = false;
-            signInBtnText.textContent = "Sign In";
+            setSignInLoading(false);
+            if (data.locked && data.wait_seconds) {
+              startLoginLockout(data.wait_seconds);
+            }
           }
         } catch (err) {
           showError("Something went wrong. Please try again.");
-          signInBtn.disabled = false;
-          signInBtnText.textContent = "Sign In";
+          setSignInLoading(false);
         }
       }
 
@@ -548,6 +638,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       });
       usernameInput.addEventListener("input", hideError);
       passwordInput.addEventListener("input", hideError);
+
+      const pageLoadLockoutRemaining = <?php echo (int) $pageLoadLockoutRemaining; ?>;
+      if (pageLoadLockoutRemaining > 0) {
+        showError("Too many failed attempts. Please wait " + pageLoadLockoutRemaining + " seconds before trying again.");
+        startLoginLockout(pageLoadLockoutRemaining);
+      }
 
       if ("serviceWorker" in navigator) {
         navigator.serviceWorker.register("../service-worker.js");

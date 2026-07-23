@@ -491,6 +491,17 @@ $conn->close();
       opacity: 1;
     }
 
+    #toast {
+      opacity: 0;
+      transform: translate(-50%, 8px);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+
+    #toast.toast-visible {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
   </style>
 </head>
 
@@ -500,8 +511,8 @@ $conn->close();
       <div class="max-w-5xl mx-auto px-4 py-2 grid grid-cols-3 items-center">
         <button
           id="backButton"
-          class="rounded-md p-1.5 bg-white border border-slate-200 hover:border-emerald-500 hover:bg-slate-50 transition-all justify-self-start flex items-center justify-center shrink-0"
-          style="width: 34px; height: 34px">
+          class="p-1.5 bg-white border border-gray-200 hover:border-emerald-500 hover:bg-slate-50 transition-all justify-self-start flex items-center justify-center shrink-0"
+          style="width: 34px; height: 34px; border-radius: 6px">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
@@ -520,8 +531,8 @@ $conn->close();
         </h1>
         <button
           id="clearCartBtn"
-          class="rounded-md p-1.5 bg-white border border-slate-200 hover:border-emerald-500 hover:bg-slate-50 transition-all justify-self-end flex items-center justify-center shrink-0"
-          style="width: 34px; height: 34px"
+          class="p-1.5 bg-white border border-gray-200 hover:border-emerald-500 hover:bg-slate-50 transition-all justify-self-end flex items-center justify-center shrink-0"
+          style="width: 34px; height: 34px; border-radius: 6px"
           title="Clear cart">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -1061,6 +1072,41 @@ $conn->close();
     </div>
   </div>
 
+  <div
+    id="clearCartModal"
+    class="fixed inset-0 z-[60] hidden flex items-center justify-center px-4">
+    <div class="modal-overlay absolute inset-0" id="closeClearCartOverlay"></div>
+    <div
+      class="bg-white w-full max-w-sm relative z-10 shadow-2xl p-5 space-y-4 text-center rounded-md">
+      <div class="w-12 h-12 bg-red-50 flex items-center justify-center mx-auto rounded-full">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-red-500">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+        </svg>
+      </div>
+      <div>
+        <p class="text-sm font-bold text-gray-800">Clear Cart</p>
+        <p class="text-xs text-gray-500 mt-1">Remove all items from your cart? This cannot be undone.</p>
+      </div>
+      <div class="flex gap-2 pt-1">
+        <button id="clearCartKeepBtn" class="flex-1 py-2.5 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors rounded-[3px]">
+          Cancel
+        </button>
+        <button id="clearCartConfirmBtn" class="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold transition-colors rounded-[3px]">
+          Clear Cart
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div
+    id="toast"
+    class="hidden items-center gap-2 fixed left-1/2 bottom-20 z-40 -translate-x-1/2 max-w-[calc(100%-2rem)] bg-gray-900 text-white text-xs font-medium px-4 py-2.5 shadow-lg rounded-[6px]">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-emerald-400 shrink-0">
+      <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+    </svg>
+    <span id="toastMessage" class="truncate"></span>
+  </div>
+
   <script>
     let cartItems = <?php echo json_encode($initialCart); ?>;
     let savedLocation = "";
@@ -1098,6 +1144,35 @@ $conn->close();
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+    }
+
+    let toastHideTimeout = null;
+    let toastRemoveTimeout = null;
+
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      const toastMessage = document.getElementById("toastMessage");
+      toastMessage.textContent = message;
+
+      if (toastHideTimeout) clearTimeout(toastHideTimeout);
+      if (toastRemoveTimeout) clearTimeout(toastRemoveTimeout);
+
+      toast.classList.remove("hidden");
+      toast.classList.add("flex");
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          toast.classList.add("toast-visible");
+        });
+      });
+
+      toastHideTimeout = setTimeout(() => {
+        toast.classList.remove("toast-visible");
+        toastRemoveTimeout = setTimeout(() => {
+          toast.classList.add("hidden");
+          toast.classList.remove("flex");
+        }, 250);
+      }, 2000);
     }
 
     function groupItemsByStall(items) {
@@ -1491,6 +1566,8 @@ $conn->close();
       container.querySelectorAll(".remove-item-btn").forEach((btn) => {
         btn.addEventListener("click", async () => {
           const cartId = parseInt(btn.getAttribute("data-cart-id"));
+          const removedItem = cartItems.find((i) => i.cart_id === cartId);
+          const removedItemName = removedItem ? removedItem.item_name : "Item";
           btn.disabled = true;
           const res = await postAction("remove_item", {
             cart_id: cartId
@@ -1499,6 +1576,7 @@ $conn->close();
           if (res.success) {
             cartItems = res.cart;
             renderCart();
+            showToast(removedItemName + " removed from cart");
           }
         });
       });
@@ -1568,19 +1646,44 @@ $conn->close();
         });
     }
 
+    function openClearCartModal() {
+      document.getElementById("clearCartModal").classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeClearCartModal() {
+      document.getElementById("clearCartModal").classList.add("hidden");
+      document.body.style.overflow = "";
+    }
+
     function setupClearCart() {
       document
         .getElementById("clearCartBtn")
+        .addEventListener("click", () => {
+          if (cartItems.length > 0) {
+            openClearCartModal();
+          }
+        });
+
+      document
+        .getElementById("closeClearCartOverlay")
+        .addEventListener("click", closeClearCartModal);
+      document
+        .getElementById("clearCartKeepBtn")
+        .addEventListener("click", closeClearCartModal);
+
+      document
+        .getElementById("clearCartConfirmBtn")
         .addEventListener("click", async () => {
-          if (
-            cartItems.length > 0 &&
-            confirm("Remove all items from your cart?")
-          ) {
-            const res = await postAction("clear_cart");
-            if (res.success) {
-              cartItems = [];
-              renderCart();
-            }
+          const confirmBtn = document.getElementById("clearCartConfirmBtn");
+          confirmBtn.disabled = true;
+          const res = await postAction("clear_cart");
+          confirmBtn.disabled = false;
+          if (res.success) {
+            cartItems = [];
+            renderCart();
+            closeClearCartModal();
+            showToast("Cart cleared");
           }
         });
     }

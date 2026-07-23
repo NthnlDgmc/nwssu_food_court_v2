@@ -93,12 +93,62 @@ function deleteStaffProfileImage($dbRelativePath)
 
 function emailTakenByOther($conn, $email, $excludeStaffId = 0)
 {
+  if ($email === '' || $email === null) return false;
+
+  $stmt = $conn->prepare("SELECT admin_id FROM admin WHERE email = ? LIMIT 1");
+  $stmt->bind_param("s", $email);
+  $stmt->execute();
+  $row = $stmt->get_result()->fetch_assoc();
+  $stmt->close();
+  if ($row) return true;
+
+  $stmt = $conn->prepare("SELECT owner_id FROM stall_owners WHERE email = ? LIMIT 1");
+  $stmt->bind_param("s", $email);
+  $stmt->execute();
+  $row = $stmt->get_result()->fetch_assoc();
+  $stmt->close();
+  if ($row) return true;
+
   $stmt = $conn->prepare("SELECT staff_id FROM delivery_staff WHERE email = ? AND staff_id != ? LIMIT 1");
   $stmt->bind_param("si", $email, $excludeStaffId);
   $stmt->execute();
   $row = $stmt->get_result()->fetch_assoc();
   $stmt->close();
-  return (bool) $row;
+  if ($row) return true;
+
+  $stmt = $conn->prepare("SELECT customer_id FROM customers WHERE email = ? LIMIT 1");
+  $stmt->bind_param("s", $email);
+  $stmt->execute();
+  $row = $stmt->get_result()->fetch_assoc();
+  $stmt->close();
+  if ($row) return true;
+
+  return false;
+}
+
+function toTitleCase($str)
+{
+  $str = preg_replace('/\s+/', ' ', trim($str));
+  if ($str === '') {
+    return '';
+  }
+  $str = mb_strtolower($str, 'UTF-8');
+  return preg_replace_callback(
+    "/(^|[\s'\-])(\p{L})/u",
+    function ($m) {
+      return $m[1] . mb_strtoupper($m[2], 'UTF-8');
+    },
+    $str
+  );
+}
+
+function isStrongPassword($password)
+{
+  if (strlen($password) < 8) return false;
+  if (!preg_match('/[A-Z]/', $password)) return false;
+  if (!preg_match('/[0-9]/', $password)) return false;
+  if (!preg_match('/[^A-Za-z0-9]/', $password)) return false;
+  return true;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
@@ -106,16 +156,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
   $action = $_POST['action'];
 
   if ($action === 'add_staff') {
-    $firstName = trim($_POST['first_name'] ?? '');
-    $lastName  = trim($_POST['last_name'] ?? '');
+    $firstName = toTitleCase(trim($_POST['first_name'] ?? ''));
+    $lastName  = toTitleCase(trim($_POST['last_name'] ?? ''));
     $contact   = trim($_POST['contact_number'] ?? '');
-    $email     = trim($_POST['email'] ?? '');
+    $email     = strtolower(preg_replace('/\s+/', '', $_POST['email'] ?? ''));
     $password  = trim($_POST['password'] ?? '');
     $status    = ($_POST['status'] ?? 'active') === 'inactive' ? 'inactive' : 'active';
     $imageData = $_POST['profile_image_data'] ?? '';
 
-    if ($firstName === '' || $lastName === '' || $contact === '' || $email === '' || $password === '') {
+    if ($firstName === '' && $lastName === '' && $contact === '' && $email === '' && $password === '') {
       echo json_encode(['success' => false, 'message' => 'Please fill in all required fields.']);
+      $conn->close();
+      exit;
+    }
+
+    if ($firstName === '') {
+      echo json_encode(['success' => false, 'message' => 'Please enter a first name.']);
+      $conn->close();
+      exit;
+    }
+
+    if (!preg_match("/^[\p{L}\s'\-]+$/u", $firstName)) {
+      echo json_encode(['success' => false, 'message' => 'First name can only contain letters.']);
+      $conn->close();
+      exit;
+    }
+
+    if ($lastName === '') {
+      echo json_encode(['success' => false, 'message' => 'Please enter a last name.']);
+      $conn->close();
+      exit;
+    }
+
+    if (!preg_match("/^[\p{L}\s'\-]+$/u", $lastName)) {
+      echo json_encode(['success' => false, 'message' => 'Last name can only contain letters.']);
+      $conn->close();
+      exit;
+    }
+
+    if ($contact === '') {
+      echo json_encode(['success' => false, 'message' => 'Please enter a contact number.']);
+      $conn->close();
+      exit;
+    }
+
+    if ($email === '') {
+      echo json_encode(['success' => false, 'message' => 'Please enter an email address.']);
       $conn->close();
       exit;
     }
@@ -132,15 +218,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
 
+    if ($password === '') {
+      echo json_encode(['success' => false, 'message' => 'Please enter a password.']);
+      $conn->close();
+      exit;
+    }
+
+    if (!isStrongPassword($password)) {
+      echo json_encode(['success' => false, 'message' => 'Password must be at least 8 characters and include an uppercase letter, a number, and a symbol.']);
+      $conn->close();
+      exit;
+    }
+
     $profileImagePath = null;
     if (strpos($imageData, 'data:image') === 0) {
       $profileImagePath = saveStaffProfileImage($imageData);
     }
 
-    $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-
     $stmt = $conn->prepare("INSERT INTO delivery_staff (profile_image, first_name, last_name, contact_number, email, password, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("sssssss", $profileImagePath, $firstName, $lastName, $contact, $email, $hashedPassword, $status);
+    $stmt->bind_param("sssssss", $profileImagePath, $firstName, $lastName, $contact, $email, $password, $status);
     $ok = $stmt->execute();
     $stmt->close();
 
@@ -153,17 +249,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
   if ($action === 'edit_staff') {
     $staffId   = (int) ($_POST['staff_id'] ?? 0);
-    $firstName = trim($_POST['first_name'] ?? '');
-    $lastName  = trim($_POST['last_name'] ?? '');
+    $firstName = toTitleCase(trim($_POST['first_name'] ?? ''));
+    $lastName  = toTitleCase(trim($_POST['last_name'] ?? ''));
     $contact   = trim($_POST['contact_number'] ?? '');
-    $email     = trim($_POST['email'] ?? '');
+    $email     = strtolower(preg_replace('/\s+/', '', $_POST['email'] ?? ''));
     $password  = trim($_POST['password'] ?? '');
     $status    = ($_POST['status'] ?? 'active') === 'inactive' ? 'inactive' : 'active';
     $imageData = $_POST['profile_image_data'] ?? '';
     $removeImage = ($_POST['remove_image'] ?? '0') === '1';
 
-    if ($staffId <= 0 || $firstName === '' || $lastName === '' || $contact === '' || $email === '') {
+    if ($staffId <= 0) {
+      echo json_encode(['success' => false, 'message' => 'Invalid delivery staff.']);
+      $conn->close();
+      exit;
+    }
+
+    if ($firstName === '' && $lastName === '' && $contact === '' && $email === '') {
       echo json_encode(['success' => false, 'message' => 'Please fill in all required fields.']);
+      $conn->close();
+      exit;
+    }
+
+    if ($firstName === '') {
+      echo json_encode(['success' => false, 'message' => 'Please enter a first name.']);
+      $conn->close();
+      exit;
+    }
+
+    if (!preg_match("/^[\p{L}\s'\-]+$/u", $firstName)) {
+      echo json_encode(['success' => false, 'message' => 'First name can only contain letters.']);
+      $conn->close();
+      exit;
+    }
+
+    if ($lastName === '') {
+      echo json_encode(['success' => false, 'message' => 'Please enter a last name.']);
+      $conn->close();
+      exit;
+    }
+
+    if (!preg_match("/^[\p{L}\s'\-]+$/u", $lastName)) {
+      echo json_encode(['success' => false, 'message' => 'Last name can only contain letters.']);
+      $conn->close();
+      exit;
+    }
+
+    if ($contact === '') {
+      echo json_encode(['success' => false, 'message' => 'Please enter a contact number.']);
+      $conn->close();
+      exit;
+    }
+
+    if ($email === '') {
+      echo json_encode(['success' => false, 'message' => 'Please enter an email address.']);
       $conn->close();
       exit;
     }
@@ -176,6 +314,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     if (emailTakenByOther($conn, $email, $staffId)) {
       echo json_encode(['success' => false, 'message' => 'This email address is already in use.']);
+      $conn->close();
+      exit;
+    }
+
+    if ($password !== '' && !isStrongPassword($password)) {
+      echo json_encode(['success' => false, 'message' => 'Password must be at least 8 characters and include an uppercase letter, a number, and a symbol.']);
       $conn->close();
       exit;
     }
@@ -204,7 +348,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     $passwordToSave = $existing['password'];
     if ($password !== '') {
-      $passwordToSave = password_hash($password, PASSWORD_DEFAULT);
+      $passwordToSave = $password;
     }
 
     $stmt = $conn->prepare("UPDATE delivery_staff SET profile_image = ?, first_name = ?, last_name = ?, contact_number = ?, email = ?, password = ?, status = ? WHERE staff_id = ?");
@@ -823,13 +967,13 @@ $conn->close();
               <span class="text-xs font-medium text-gray-700">Active</span>
             </label>
             <label
-              class="flex items-center gap-2 p-2.5 flex-1 border border-gray-200 cursor-pointer hover:border-emerald-500 transition-all has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50/40"
+              class="flex items-center gap-2 p-2.5 flex-1 border border-gray-200 cursor-pointer hover:border-red-400 transition-all has-[:checked]:border-red-400 has-[:checked]:bg-red-50/40"
               style="border-radius: 3px">
               <input
                 type="radio"
                 name="staffStatus"
                 value="inactive"
-                class="accent-emerald-600 shrink-0" />
+                class="accent-red-500 shrink-0" />
               <span class="text-xs font-medium text-gray-700">Inactive</span>
             </label>
           </div>
@@ -974,6 +1118,31 @@ $conn->close();
       return ((first[0] || "") + (last[0] || "")).toUpperCase();
     }
 
+    function isValidEmail(val) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+    }
+
+    function toTitleCase(str) {
+      return str
+        .trim()
+        .replace(/\s+/g, " ")
+        .toLowerCase()
+        .replace(/(^|[\s'-])\p{L}/gu, (c) => c.toUpperCase());
+    }
+
+    function isValidName(val) {
+      return /^[\p{L}\s'-]+$/u.test(val);
+    }
+
+    function isStrongPassword(val) {
+      return (
+        val.length >= 8 &&
+        /[A-Z]/.test(val) &&
+        /[0-9]/.test(val) &&
+        /[^A-Za-z0-9]/.test(val)
+      );
+    }
+
     function displayOrDash(val) {
       const v = (val || "").toString().trim();
       return v === "" ? "–" : escapeHtml(v);
@@ -1092,7 +1261,7 @@ $conn->close();
       document.getElementById("fieldEmail").value = "";
       document.getElementById("fieldPassword").value = "";
       document.getElementById("fieldPassword").placeholder = "Enter password";
-      document.getElementById("passwordHint").textContent = "";
+      document.getElementById("passwordHint").textContent = "Must include uppercase, a number, and a symbol.";
       document.querySelector("input[name='staffStatus'][value='active']").checked = true;
       document.getElementById("staffFormError").classList.add("hidden");
       document.getElementById("staffFormError").classList.remove("flex");
@@ -1161,8 +1330,75 @@ $conn->close();
 
       const isEditing = !!editingStaffId;
 
-      if (!firstName || !lastName || !contact || !email || (!isEditing && !password)) {
+      const allCoreBlank = isEditing
+        ? (!firstName && !lastName && !contact && !email)
+        : (!firstName && !lastName && !contact && !email && !password);
+
+      if (allCoreBlank) {
         errMsg.textContent = "Please fill in all required fields.";
+        errEl.classList.remove("hidden");
+        errEl.classList.add("flex");
+        return;
+      }
+
+      if (!firstName) {
+        errMsg.textContent = "Please enter a first name.";
+        errEl.classList.remove("hidden");
+        errEl.classList.add("flex");
+        return;
+      }
+
+      if (!isValidName(firstName)) {
+        errMsg.textContent = "First name can only contain letters.";
+        errEl.classList.remove("hidden");
+        errEl.classList.add("flex");
+        return;
+      }
+
+      if (!lastName) {
+        errMsg.textContent = "Please enter a last name.";
+        errEl.classList.remove("hidden");
+        errEl.classList.add("flex");
+        return;
+      }
+
+      if (!isValidName(lastName)) {
+        errMsg.textContent = "Last name can only contain letters.";
+        errEl.classList.remove("hidden");
+        errEl.classList.add("flex");
+        return;
+      }
+
+      if (!contact) {
+        errMsg.textContent = "Please enter a contact number.";
+        errEl.classList.remove("hidden");
+        errEl.classList.add("flex");
+        return;
+      }
+
+      if (!email) {
+        errMsg.textContent = "Please enter an email address.";
+        errEl.classList.remove("hidden");
+        errEl.classList.add("flex");
+        return;
+      }
+
+      if (!isValidEmail(email)) {
+        errMsg.textContent = "Please enter a valid email address.";
+        errEl.classList.remove("hidden");
+        errEl.classList.add("flex");
+        return;
+      }
+
+      if (!isEditing && !password) {
+        errMsg.textContent = "Please enter a password.";
+        errEl.classList.remove("hidden");
+        errEl.classList.add("flex");
+        return;
+      }
+
+      if (password && !isStrongPassword(password)) {
+        errMsg.textContent = "Password must be at least 8 characters and include an uppercase letter, a number, and a symbol.";
         errEl.classList.remove("hidden");
         errEl.classList.add("flex");
         return;
@@ -1305,6 +1541,42 @@ $conn->close();
             document.getElementById("fieldFirstName").value.trim() || "?",
             document.getElementById("fieldLastName").value.trim() || "",
           ) || "?";
+      });
+
+      [document.getElementById("fieldFirstName"), document.getElementById("fieldLastName")].forEach((el) => {
+        el.addEventListener("input", () => {
+          const cursorPos = el.selectionStart;
+          const cleaned = el.value.replace(/[^\p{L}\s'-]/gu, "");
+          if (cleaned !== el.value) {
+            const removedCount = el.value.length - cleaned.length;
+            el.value = cleaned;
+            const newPos = Math.max(0, cursorPos - removedCount);
+            el.setSelectionRange(newPos, newPos);
+          }
+        });
+
+        el.addEventListener("blur", () => {
+          if (el.value.trim()) {
+            el.value = toTitleCase(el.value);
+          }
+        });
+      });
+
+      document.getElementById("fieldEmail").addEventListener("input", (e) => {
+        const cursorPos = e.target.selectionStart;
+        const cleaned = e.target.value.replace(/\s/g, "");
+        if (cleaned !== e.target.value) {
+          const removedCount = e.target.value.length - cleaned.length;
+          e.target.value = cleaned;
+          const newPos = Math.max(0, cursorPos - removedCount);
+          e.target.setSelectionRange(newPos, newPos);
+        }
+      });
+
+      document.getElementById("fieldEmail").addEventListener("blur", (e) => {
+        if (e.target.value.trim()) {
+          e.target.value = e.target.value.trim().toLowerCase();
+        }
       });
 
       document.getElementById("togglePasswordBtn").addEventListener("click", () => {
