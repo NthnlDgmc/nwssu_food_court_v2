@@ -649,20 +649,22 @@ $conn->close();
             <p class="text-[10px] text-gray-400 mt-1.5">
               At least 8 characters, with an uppercase letter, a number, and a symbol.
             </p>
-            <div class="flex items-center gap-1.5 mt-2" id="strengthBarWrapper">
-              <div class="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
-                <div id="strengthBar1" class="strength-bar h-full w-0 bg-gray-200"></div>
+            <div class="mt-2">
+              <div class="flex items-center gap-1.5" id="strengthBarWrapper">
+                <div class="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
+                  <div id="strengthBar1" class="strength-bar h-full w-0 bg-gray-200"></div>
+                </div>
+                <div class="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
+                  <div id="strengthBar2" class="strength-bar h-full w-0 bg-gray-200"></div>
+                </div>
+                <div class="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
+                  <div id="strengthBar3" class="strength-bar h-full w-0 bg-gray-200"></div>
+                </div>
+                <div class="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
+                  <div id="strengthBar4" class="strength-bar h-full w-0 bg-gray-200"></div>
+                </div>
               </div>
-              <div class="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
-                <div id="strengthBar2" class="strength-bar h-full w-0 bg-gray-200"></div>
-              </div>
-              <div class="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
-                <div id="strengthBar3" class="strength-bar h-full w-0 bg-gray-200"></div>
-              </div>
-              <div class="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
-                <div id="strengthBar4" class="strength-bar h-full w-0 bg-gray-200"></div>
-              </div>
-              <span id="strengthLabel" class="text-[10px] font-semibold text-gray-400 w-10 text-right shrink-0"></span>
+              <p class="text-[10px] mt-1" id="strengthLabel"></p>
             </div>
           </div>
           <div>
@@ -1052,7 +1054,7 @@ $conn->close();
         });
 
         strengthLabel.textContent = result.label;
-        strengthLabel.className = "text-[10px] font-semibold w-10 text-right shrink-0 " + result.labelColor;
+        strengthLabel.className = "text-[10px] mt-1 font-semibold " + result.labelColor;
       }
 
       newPasswordInput.addEventListener("input", updateStrengthBar);

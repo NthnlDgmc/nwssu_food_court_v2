@@ -133,8 +133,11 @@
           id="chatThreadPanel"
           class="mobile-hide w-full flex-1 flex flex-col h-full lg:px-4 lg:pt-3 lg:pb-4">
           <div class="flex flex-col h-full min-h-0 lg:bg-white lg:border lg:border-gray-200 lg:shadow-sm lg:rounded-md lg:overflow-hidden">
-            <div class="border-b border-gray-100 px-3 py-2.5 flex items-center gap-3 shrink-0">
-              <button id="backToListBtn" class="lg:hidden p-1.5 hover:bg-gray-100 transition-colors shrink-0" style="border-radius: 3px">
+            <div class="px-4 py-2 flex items-center gap-3 shrink-0">
+              <button
+                id="backToListBtn"
+                class="lg:hidden p-1.5 bg-white border border-gray-200 hover:border-emerald-500 hover:bg-slate-50 transition-all flex items-center justify-center shrink-0"
+                style="width: 34px; height: 34px; border-radius: 6px">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-600">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
                 </svg>
@@ -142,7 +145,6 @@
               <div id="threadAvatar" class="w-8 h-8 flex items-center justify-center text-white text-xs font-bold shrink-0 rounded-full"></div>
               <div class="flex-1 min-w-0">
                 <p id="threadName" class="text-sm font-semibold text-gray-800 truncate"></p>
-                <span id="threadSubLabel" class="text-[10px] font-semibold px-1.5 py-0.5 border capitalize inline-block mt-0.5" style="border-radius: 3px"></span>
               </div>
               <button id="callContactBtn" class="p-2 hover:bg-gray-100 transition-colors shrink-0" style="border-radius: 3px" title="Call">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-emerald-600">
@@ -433,10 +435,6 @@
       avatarEl.className = `w-8 h-8 ${meta.avatarCls} flex items-center justify-center text-white text-xs font-bold shrink-0 rounded-full`;
 
       document.getElementById("threadName").textContent = conv.name;
-      const badge = document.getElementById("threadSubLabel");
-      badge.textContent = conv.subLabel;
-      badge.className = `text-[10px] font-semibold px-1.5 py-0.5 border inline-block mt-0.5 ${meta.badgeCls}`;
-      badge.style.borderRadius = "3px";
 
       document.getElementById("callContactBtn").setAttribute("data-phone", conv.phone || "");
 
