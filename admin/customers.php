@@ -9,7 +9,7 @@ if (!isset($_SESSION['admin_id'])) {
 
 $adminId = $_SESSION['admin_id'];
 
-$adminStmt = $conn->prepare("SELECT first_name, last_name, profile_image FROM admin WHERE admin_id = ? LIMIT 1");
+$adminStmt = $conn->prepare("SELECT first_name, last_name, profile_image FROM admins WHERE admin_id = ? LIMIT 1");
 $adminStmt->bind_param("s", $adminId);
 $adminStmt->execute();
 $adminResult = $adminStmt->get_result();
@@ -35,7 +35,7 @@ function getAdminInitials($first, $last)
 
 $adminInitials = getAdminInitials($adminFirstName, $adminLastName);
 
-$ALLOWED_CUSTOMER_TYPES = ['student', 'faculty', 'staff', 'outsider'];
+$ALLOWED_CUSTOMER_TYPES = ['student', 'faculty', 'staff', 'guest'];
 
 function fetchCustomersData($conn)
 {
@@ -99,7 +99,7 @@ function emailTakenByOther($conn, $email, $excludeCustomerId = 0)
 {
   if ($email === '' || $email === null) return false;
 
-  $stmt = $conn->prepare("SELECT admin_id FROM admin WHERE email = ? LIMIT 1");
+  $stmt = $conn->prepare("SELECT admin_id FROM admins WHERE email = ? LIMIT 1");
   $stmt->bind_param("s", $email);
   $stmt->execute();
   $row = $stmt->get_result()->fetch_assoc();
@@ -216,19 +216,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
 
-    if ($custType !== 'outsider' && $idNumber === '') {
+    if ($custType !== 'guest' && $idNumber === '') {
       echo json_encode(['success' => false, 'message' => 'Please enter an ID number.']);
       $conn->close();
       exit;
     }
 
-    if ($custType !== 'outsider' && !preg_match('/^[0-9-]+$/', $idNumber)) {
+    if ($custType !== 'guest' && !preg_match('/^[0-9-]+$/', $idNumber)) {
       echo json_encode(['success' => false, 'message' => 'ID number can only contain numbers and hyphens.']);
       $conn->close();
       exit;
     }
 
-    if ($custType === 'outsider') {
+    if ($custType === 'guest') {
       $idNumber = '';
     }
 
@@ -336,19 +336,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
 
-    if ($custType !== 'outsider' && $idNumber === '') {
+    if ($custType !== 'guest' && $idNumber === '') {
       echo json_encode(['success' => false, 'message' => 'Please enter an ID number.']);
       $conn->close();
       exit;
     }
 
-    if ($custType !== 'outsider' && !preg_match('/^[0-9-]+$/', $idNumber)) {
+    if ($custType !== 'guest' && !preg_match('/^[0-9-]+$/', $idNumber)) {
       echo json_encode(['success' => false, 'message' => 'ID number can only contain numbers and hyphens.']);
       $conn->close();
       exit;
     }
 
-    if ($custType === 'outsider') {
+    if ($custType === 'guest') {
       $idNumber = '';
     }
 
@@ -585,9 +585,9 @@ $conn->close();
             </svg>
           </button>
           <nav class="flex items-center gap-1.5 text-xs text-gray-500 min-w-0" aria-label="Breadcrumb">
-            <a href="./dashboard.php" class="hover:text-emerald-600 shrink-0">Dashboard</a>
+            <a href="./dashboard.php" class="hover:text-gray-900 shrink-0">Dashboard</a>
             <span class="text-gray-300 shrink-0">/</span>
-            <span class="text-gray-700 font-medium truncate">Customers</span>
+            <span class="text-emerald-600 font-medium truncate">Customers</span>
           </nav>
         </div>
         <button
@@ -769,7 +769,7 @@ $conn->close();
                 <option value="student">Student</option>
                 <option value="faculty">Faculty</option>
                 <option value="staff">Staff</option>
-                <option value="outsider">Outsider</option>
+                <option value="guest">Guest</option>
               </select>
               <span
                 id="typeFilterMeasure"
@@ -976,9 +976,9 @@ $conn->close();
               <input
                 type="radio"
                 name="customerType"
-                value="outsider"
+                value="guest"
                 class="accent-emerald-600 shrink-0" />
-              <span class="text-xs font-medium text-gray-700">Outsider</span>
+              <span class="text-xs font-medium text-gray-700">Guest</span>
             </label>
           </div>
         </div>
@@ -1237,8 +1237,8 @@ $conn->close();
         label: "Staff",
         cls: "bg-teal-50 text-teal-700 border-teal-200"
       },
-      outsider: {
-        label: "Outsider",
+      guest: {
+        label: "Guest",
         cls: "bg-zinc-100 text-zinc-600 border-zinc-200"
       },
     };
@@ -1328,7 +1328,7 @@ $conn->close();
     function typeBadge(type) {
       const t = CUSTOMER_TYPE_MAP[type];
       if (!t) return "";
-      return `<span class="text-[10px] font-semibold px-2 py-0.5 border ${t.cls}" style="border-radius:3px">${t.label}</span>`;
+      return `<span class="text-[10px] font-semibold px-2 py-0.5 border rounded-[3px] ${t.cls}">${t.label}</span>`;
     }
 
     function avatarHtml(person) {
@@ -1432,10 +1432,10 @@ $conn->close();
 
     function toggleIdNumberField() {
       const checked = document.querySelector("input[name='customerType']:checked");
-      const isOutsider = checked && checked.value === "outsider";
+      const isGuest = checked && checked.value === "guest";
       const wrap = document.getElementById("idNumberFieldWrap");
-      wrap.classList.toggle("hidden", isOutsider);
-      if (isOutsider) {
+      wrap.classList.toggle("hidden", isGuest);
+      if (isGuest) {
         document.getElementById("fieldIdNumber").value = "";
       }
     }
@@ -1571,14 +1571,14 @@ $conn->close();
         return;
       }
 
-      if (customerType !== "outsider" && !idNumber) {
+      if (customerType !== "guest" && !idNumber) {
         errMsg.textContent = "Please enter an ID number.";
         errEl.classList.remove("hidden");
         errEl.classList.add("flex");
         return;
       }
 
-      if (customerType !== "outsider" && !isValidIdNumber(idNumber)) {
+      if (customerType !== "guest" && !isValidIdNumber(idNumber)) {
         errMsg.textContent = "ID number can only contain numbers and hyphens.";
         errEl.classList.remove("hidden");
         errEl.classList.add("flex");

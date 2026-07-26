@@ -1045,7 +1045,11 @@ $avatarInitial = mb_strtoupper(mb_substr($firstName, 0, 1));
               });
               const res = await response.json();
 
-              if (!res.success) {
+              if (res.success) {
+                const item = ALL_MENU_ITEMS.find((it) => it.menu_item_id === menuItemId);
+                const itemLabel = item ? item.item_name : "Item";
+                showToast(itemLabel + (wasFavorited ? " removed from favorites" : " added to favorites"));
+              } else {
                 if (wasFavorited) {
                   FAVORITE_ITEM_IDS.add(menuItemId);
                   svg.setAttribute("fill", "currentColor");

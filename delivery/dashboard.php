@@ -625,8 +625,8 @@ $conn->close();
         label: "Staff",
         cls: "bg-teal-50 text-teal-700 border-teal-200"
       },
-      outsider: {
-        label: "Outsider",
+      guest: {
+        label: "Guest",
         cls: "bg-zinc-100 text-zinc-600 border-zinc-200"
       },
     };
@@ -701,7 +701,7 @@ $conn->close();
     function customerTypeBadge(type) {
       const t = CUSTOMER_TYPE_MAP[type];
       if (!t) return "";
-      return `<span class="text-[9px] font-semibold px-1.5 py-0.5 border ${t.cls} shrink-0" style="border-radius:3px">${t.label}</span>`;
+      return `<span class="text-[10px] font-semibold px-2 py-0.5 border rounded-[3px] ${t.cls}">${t.label}</span>`;
     }
 
     function deliveryStatusBadge(status) {

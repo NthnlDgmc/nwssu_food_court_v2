@@ -1065,7 +1065,8 @@ $conn->close();
         </button>
         <button
           id="modalSaveBtn"
-          class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors rounded-[3px]">
+          disabled
+          class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-70 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors rounded-[3px]">
           Save Note
         </button>
       </div>
@@ -1113,6 +1114,12 @@ $conn->close();
     let globalOrderType = "delivery";
     let currentModalStallId = null;
     let currentModalStall = null;
+    let initialNoteValue = "";
+
+    function checkForNoteChanges() {
+      const current = document.getElementById("modalNoteInput").value;
+      document.getElementById("modalSaveBtn").disabled = current === initialNoteValue;
+    }
     let activeQtyKey = null;
 
     async function postAction(action, data = {}) {
@@ -1381,6 +1388,8 @@ $conn->close();
       currentModalStall = stallName;
       document.getElementById("modalStallName").textContent = stallName;
       document.getElementById("modalNoteInput").value = currentNote || "";
+      initialNoteValue = currentNote || "";
+      document.getElementById("modalSaveBtn").disabled = true;
       updateModalCharCount();
       document.getElementById("noteModal").classList.remove("hidden");
       document.body.style.overflow = "hidden";
@@ -1415,6 +1424,7 @@ $conn->close();
         });
         closeNoteModal();
         renderCart();
+        showToast("Note saved");
       }
     }
 
@@ -1636,6 +1646,7 @@ $conn->close();
         .addEventListener("click", () => {
           document.getElementById("modalNoteInput").value = "";
           updateModalCharCount();
+          checkForNoteChanges();
         });
       document
         .getElementById("modalNoteInput")
@@ -1643,6 +1654,7 @@ $conn->close();
           const el = document.getElementById("modalNoteInput");
           if (el.value.length > 100) el.value = el.value.slice(0, 100);
           updateModalCharCount();
+          checkForNoteChanges();
         });
     }
 

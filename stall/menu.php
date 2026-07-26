@@ -714,13 +714,13 @@ $conn->close();
               <span class="text-xs font-medium text-gray-700">Available</span>
             </label>
             <label
-              class="flex items-center gap-2 p-2.5 flex-1 border border-gray-200 cursor-pointer hover:border-emerald-500 transition-all has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50/40"
+              class="flex items-center gap-2 p-2.5 flex-1 border border-gray-200 cursor-pointer hover:border-red-400 transition-all has-[:checked]:border-red-400 has-[:checked]:bg-red-50/40"
               style="border-radius: 3px">
               <input
                 type="radio"
                 name="itemStatus"
                 value="unavailable"
-                class="accent-emerald-600 shrink-0" />
+                class="accent-red-500 shrink-0" />
               <span class="text-xs font-medium text-gray-700">Unavailable</span>
             </label>
           </div>
@@ -738,7 +738,7 @@ $conn->close();
 
         <div
           id="itemFormError"
-          class="hidden flex items-start gap-2 p-3 bg-red-50 border border-red-200"
+          class="hidden flex items-center gap-2 p-3 bg-red-50 border border-red-200"
           style="border-radius: 3px">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -746,14 +746,14 @@ $conn->close();
             viewBox="0 0 24 24"
             stroke-width="1.5"
             stroke="currentColor"
-            class="w-4 h-4 text-red-500 shrink-0 mt-0.5">
+            class="w-4 h-4 text-red-500 shrink-0">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
               d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
           </svg>
           <p
-            class="text-[10px] text-red-600 font-medium"
+            class="text-[10px] text-red-600 font-medium leading-none"
             id="itemFormErrorMsg"></p>
         </div>
       </div>

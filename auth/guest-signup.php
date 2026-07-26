@@ -78,7 +78,7 @@ function isEmailRegisteredAnywhere($conn, $email)
 {
   if ($email === '' || $email === null) return false;
 
-  $stmt = $conn->prepare("SELECT admin_id FROM admin WHERE email = ? LIMIT 1");
+  $stmt = $conn->prepare("SELECT admin_id FROM admins WHERE email = ? LIMIT 1");
   $stmt->bind_param("s", $email);
   $stmt->execute();
   $row = $stmt->get_result()->fetch_assoc();
@@ -125,7 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
   if ($action === 'send_code') {
     $firstName = toTitleCase(trim($_POST['first_name'] ?? ''));
     $lastName = toTitleCase(trim($_POST['last_name'] ?? ''));
-    $contact = preg_replace('/\D/', '', $_POST['contact_number'] ?? '');
+    $contact = trim($_POST['contact_number'] ?? '');
     $email = strtolower(preg_replace('/\s+/', '', $_POST['email'] ?? ''));
     $password = trim($_POST['password'] ?? '');
     $confirmPassword = trim($_POST['confirm_password'] ?? '');
@@ -153,14 +153,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
     if ($contact === '') {
       echo json_encode(['success' => false, 'message' => 'Please enter your contact number.']);
-      exit;
-    }
-    if (strlen($contact) !== 10) {
-      echo json_encode(['success' => false, 'message' => 'Contact number must be 10 digits.']);
-      exit;
-    }
-    if ($contact[0] !== '9') {
-      echo json_encode(['success' => false, 'message' => 'Contact number must start with 9.']);
       exit;
     }
     if ($email === '') {
@@ -195,7 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $_SESSION['pending_signup'] = [
       'first_name' => $firstName,
       'last_name' => $lastName,
-      'contact_number' => '+63' . $contact,
+      'contact_number' => $contact,
       'email' => $email,
       'password' => $password,
       'last_sent_at' => time(),
@@ -303,7 +295,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
 
-    $stmt = $conn->prepare("INSERT INTO customers (customer_type, id_number, first_name, last_name, contact_number, email, password, status) VALUES ('outsider', NULL, ?, ?, ?, ?, ?, 'active')");
+    $stmt = $conn->prepare("INSERT INTO customers (customer_type, id_number, first_name, last_name, contact_number, email, password, status) VALUES ('guest', NULL, ?, ?, ?, ?, ?, 'active')");
     $stmt->bind_param(
       "sssss",
       $pending['first_name'],
@@ -393,7 +385,7 @@ $conn->close();
             Create Account
           </h1>
           <p class="text-xs text-gray-500 mt-1">
-            NwSSU Food Court sign-up &middot; Outside customers only
+            NwSSU Food Court sign-up &middot; Guest customers only
           </p>
         </div>
 
@@ -465,21 +457,13 @@ $conn->close();
             >
               Contact Number <span class="text-red-400">*</span>
             </label>
-            <div class="relative">
-              <div
-                class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium pointer-events-none"
-              >
-                +63
-              </div>
-              <input
-                type="tel"
-                id="contactNumber"
-                autocomplete="tel"
-                maxlength="10"
-                placeholder="9XX XXX XXXX"
-                class="w-full pl-10 pr-3 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600 rounded-[3px]"
-              />
-            </div>
+            <input
+              type="tel"
+              id="contactNumber"
+              autocomplete="tel"
+              placeholder="0917 123 4567"
+              class="w-full px-3 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600 rounded-[3px]"
+            />
           </div>
 
           <div>
@@ -872,7 +856,6 @@ $conn->close();
       makeToggle("pwToggle2", confirmPassword, "pwIcon2");
 
       contactNumber.addEventListener("input", () => {
-        contactNumber.value = contactNumber.value.replace(/\D/g, "").slice(0, 10);
         hideError();
       });
 
@@ -1002,16 +985,6 @@ $conn->close();
         }
         if (!tel) {
           showError("Please enter your contact number.");
-          markError(contactNumber);
-          return;
-        }
-        if (tel.length < 10) {
-          showError("Contact number must be 10 digits.");
-          markError(contactNumber);
-          return;
-        }
-        if (!tel.startsWith("9")) {
-          showError("Contact number must start with 9.");
           markError(contactNumber);
           return;
         }

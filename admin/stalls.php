@@ -9,7 +9,7 @@ if (!isset($_SESSION['admin_id'])) {
 
 $adminId = $_SESSION['admin_id'];
 
-$adminStmt = $conn->prepare("SELECT first_name, last_name, profile_image FROM admin WHERE admin_id = ? LIMIT 1");
+$adminStmt = $conn->prepare("SELECT first_name, last_name, profile_image FROM admins WHERE admin_id = ? LIMIT 1");
 $adminStmt->bind_param("s", $adminId);
 $adminStmt->execute();
 $adminResult = $adminStmt->get_result();
@@ -402,9 +402,9 @@ $conn->close();
             </svg>
           </button>
           <nav class="flex items-center gap-1.5 text-xs text-gray-500 min-w-0" aria-label="Breadcrumb">
-            <a href="./dashboard.php" class="hover:text-emerald-600 shrink-0">Dashboard</a>
+            <a href="./dashboard.php" class="hover:text-gray-900 shrink-0">Dashboard</a>
             <span class="text-gray-300 shrink-0">/</span>
-            <span class="text-gray-700 font-medium truncate">Stalls</span>
+            <span class="text-emerald-600 font-medium truncate">Stalls</span>
           </nav>
         </div>
         <button
@@ -696,13 +696,13 @@ $conn->close();
               <span class="text-xs font-medium text-gray-700">Open</span>
             </label>
             <label
-              class="flex items-center gap-2 p-2.5 flex-1 border border-gray-200 cursor-pointer hover:border-emerald-500 transition-all has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50/40"
+              class="flex items-center gap-2 p-2.5 flex-1 border border-gray-200 cursor-pointer hover:border-red-400 transition-all has-[:checked]:border-red-400 has-[:checked]:bg-red-50/40"
               style="border-radius: 3px">
               <input
                 type="radio"
                 name="stallStatus"
                 value="closed"
-                class="accent-emerald-600 shrink-0" />
+                class="accent-red-500 shrink-0" />
               <span class="text-xs font-medium text-gray-700">Closed</span>
             </label>
           </div>

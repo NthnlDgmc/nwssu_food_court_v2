@@ -908,6 +908,7 @@ sort($stallOptions);
       student: { label: "Student", cls: "bg-sky-50 text-sky-700 border-sky-200" },
       faculty: { label: "Faculty", cls: "bg-violet-50 text-violet-700 border-violet-200" },
       staff: { label: "Staff", cls: "bg-teal-50 text-teal-700 border-teal-200" },
+      guest: { label: "Guest", cls: "bg-zinc-100 text-zinc-600 border-zinc-200" },
     };
 
     const MAX_PROOF_DIMENSION = 700;
@@ -993,7 +994,7 @@ sort($stallOptions);
     function customerTypeBadgeHtml(type) {
       const t = CUSTOMER_TYPE_MAP[type];
       if (!t) return "";
-      return `<span class="text-[9px] font-semibold px-1.5 py-0.5 border ${t.cls} shrink-0" style="border-radius:3px">${t.label}</span>`;
+      return `<span class="text-[10px] font-semibold px-2 py-0.5 border rounded-[3px] ${t.cls}">${t.label}</span>`;
     }
 
     function copyToClipboard(text, iconEl) {

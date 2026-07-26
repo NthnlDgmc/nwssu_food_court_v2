@@ -21,7 +21,7 @@ function isStrongPassword($password)
 
 function findUserByEmail($conn, $email)
 {
-  $stmt = $conn->prepare("SELECT admin_id FROM admin WHERE email = ? LIMIT 1");
+  $stmt = $conn->prepare("SELECT admin_id FROM admins WHERE email = ? LIMIT 1");
   $stmt->bind_param("s", $email);
   $stmt->execute();
   if ($stmt->get_result()->fetch_assoc()) {
@@ -63,7 +63,7 @@ function findUserByEmail($conn, $email)
 function updatePasswordByType($conn, $userType, $email, $newPassword)
 {
   $tableMap = [
-    'admin' => 'admin',
+    'admin' => 'admins',
     'stall_owner' => 'stall_owners',
     'delivery_staff' => 'delivery_staff',
     'customer' => 'customers',

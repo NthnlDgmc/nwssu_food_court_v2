@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    $stmt = $conn->prepare("SELECT admin_id, password, first_name, last_name FROM admin WHERE email = ? LIMIT 1");
+    $stmt = $conn->prepare("SELECT admin_id, password, first_name, last_name FROM admins WHERE email = ? LIMIT 1");
     $stmt->bind_param("s", $username);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -326,7 +326,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               />
             </div>
             <p class="text-[10px] text-gray-400 mt-1.5">
-              Campus users: ID number &nbsp;&middot;&nbsp; Outside: email
+              Campus users: ID number &nbsp;&middot;&nbsp; Guest: email
               address
             </p>
           </div>
@@ -493,7 +493,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </svg>
           </a>
           <p class="text-center text-[10px] text-gray-400">
-            This sign-up is for outside customers only
+            This sign-up is for guest customers only
           </p>
 
           <div

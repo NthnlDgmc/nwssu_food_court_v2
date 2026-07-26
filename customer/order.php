@@ -536,13 +536,8 @@ $conn->close();
         padding: 3px 10px;
         font-size: 11px;
         font-weight: 600;
-        background: #ffffff;
-        border: 1px solid #d1d5db;
-        color: #374151;
-      }
-      .status-cancelled {
-        color: #6b7280;
-        border-color: #d1d5db;
+        border-width: 1px;
+        border-style: solid;
       }
       .step-done {
         background: #059669;
@@ -1148,15 +1143,15 @@ $conn->close();
 
     <script>
       const STATUS_META = {
-        pending: { label: "Pending", cls: "" },
-        preparing: { label: "Preparing", cls: "" },
-        ready_for_pickup: { label: "Ready for Pickup", cls: "" },
-        ready_for_dispatch: { label: "Ready for Dispatch", cls: "" },
-        collected: { label: "Collected", cls: "" },
-        out_for_delivery: { label: "Out for Delivery", cls: "" },
-        completed: { label: "Completed", cls: "" },
-        delivered: { label: "Delivered", cls: "" },
-        cancelled: { label: "Cancelled", cls: "status-cancelled" },
+        pending: { label: "Pending", cls: "bg-amber-50 text-amber-700 border-amber-200" },
+        preparing: { label: "Preparing", cls: "bg-blue-50 text-blue-700 border-blue-200" },
+        ready_for_pickup: { label: "Ready for Pickup", cls: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+        ready_for_dispatch: { label: "Ready for Dispatch", cls: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+        collected: { label: "Collected", cls: "bg-blue-50 text-blue-700 border-blue-200" },
+        out_for_delivery: { label: "Out for Delivery", cls: "bg-blue-50 text-blue-700 border-blue-200" },
+        completed: { label: "Completed", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+        delivered: { label: "Delivered", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+        cancelled: { label: "Cancelled", cls: "bg-gray-100 text-gray-500 border-gray-200" },
       };
 
       const STEPS = [
@@ -1186,12 +1181,6 @@ $conn->close();
         { value: "delivered", label: "Delivered" },
         { value: "cancelled", label: "Cancelled" },
       ];
-
-      const CUSTOMER_TYPE_MAP = {
-        student: { label: "Student", cls: "bg-sky-50 text-sky-700 border-sky-200" },
-        faculty: { label: "Faculty", cls: "bg-violet-50 text-violet-700 border-violet-200" },
-        staff: { label: "Staff", cls: "bg-teal-50 text-teal-700 border-teal-200" },
-      };
 
       let ALL_ORDERS = <?php echo json_encode($initialOrders); ?>;
 
@@ -1477,7 +1466,7 @@ $conn->close();
           <div>
             <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Order Progress</h3>
             <div class="border border-gray-100 p-4 rounded-md">
-              ${order.status === "cancelled" ? `<div class="text-center py-2"><span class="status-badge rounded-[3px] status-cancelled">Order Cancelled</span>${order.cancelReason ? `<p class="text-[11px] text-gray-500 mt-2">${escapeHtml(order.cancelReason)}</p>` : ""}</div>` : buildTrackerHTML(order)}
+              ${order.status === "cancelled" ? `<div class="text-center py-2"><span class="status-badge rounded-[3px] bg-gray-100 text-gray-500 border-gray-200">Order Cancelled</span>${order.cancelReason ? `<p class="text-[11px] text-gray-500 mt-2">${escapeHtml(order.cancelReason)}</p>` : ""}</div>` : buildTrackerHTML(order)}
             </div>
           </div>
           <div class="space-y-4">

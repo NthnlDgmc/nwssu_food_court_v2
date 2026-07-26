@@ -10,15 +10,13 @@ if (!isset($_SESSION['admin_id'])) {
 $adminId = $_SESSION['admin_id'];
 
 function fetchAdminProfile($conn, $adminId) {
-    $stmt = $conn->prepare("SELECT first_name, last_name, contact_number, email, profile_image, created_at FROM admin WHERE admin_id = ? LIMIT 1");
+    $stmt = $conn->prepare("SELECT first_name, last_name, contact_number, email, profile_image, created_at FROM admins WHERE admin_id = ? LIMIT 1");
     $stmt->bind_param("i", $adminId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
 
     if ($row) {
-        $digits = preg_replace('/\D/', '', $row['contact_number']);
-        $row['contact_local'] = substr($digits, -10);
         $row['member_since'] = date('M Y', strtotime($row['created_at']));
         $row['profile_image'] = $row['profile_image'] ? '../' . $row['profile_image'] : null;
     }
@@ -55,27 +53,60 @@ function handleProfileImageUpload($file) {
     return null;
 }
 
+function toTitleCase($str)
+{
+    $str = preg_replace('/\s+/', ' ', trim($str));
+    if ($str === '') {
+        return '';
+    }
+    $str = mb_strtolower($str, 'UTF-8');
+    return preg_replace_callback(
+        "/(^|[\s'\-])(\p{L})/u",
+        function ($m) {
+            return $m[1] . mb_strtoupper($m[2], 'UTF-8');
+        },
+        $str
+    );
+}
+
+function isStrongPassword($password)
+{
+    if (strlen($password) < 8) return false;
+    if (!preg_match('/[A-Z]/', $password)) return false;
+    if (!preg_match('/[0-9]/', $password)) return false;
+    if (!preg_match('/[^A-Za-z0-9]/', $password)) return false;
+    return true;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     header('Content-Type: application/json');
     $action = $_POST['action'];
 
     if ($action === 'edit_profile') {
-        $firstName = trim($_POST['first_name'] ?? '');
-        $lastName = trim($_POST['last_name'] ?? '');
-        $contact = preg_replace('/\D/', '', $_POST['contact_number'] ?? '');
-        $email = trim($_POST['email'] ?? '');
+        $firstName = toTitleCase(trim($_POST['first_name'] ?? ''));
+        $lastName = toTitleCase(trim($_POST['last_name'] ?? ''));
+        $contact = trim($_POST['contact_number'] ?? '');
+        $email = strtolower(preg_replace('/\s+/', '', $_POST['email'] ?? ''));
         $removeImage = ($_POST['remove_image'] ?? '') === '1';
 
         if ($firstName === '') {
             echo json_encode(['success' => false, 'message' => 'First name is required.']);
             exit;
         }
+        if (!preg_match("/^[\p{L}\s'\-]+$/u", $firstName)) {
+            echo json_encode(['success' => false, 'message' => 'First name can only contain letters.']);
+            exit;
+        }
         if ($lastName === '') {
             echo json_encode(['success' => false, 'message' => 'Last name is required.']);
             exit;
         }
-        if (strlen($contact) !== 10 || $contact[0] !== '9') {
-            echo json_encode(['success' => false, 'message' => 'Please enter a valid 10-digit contact number starting with 9.']);
+        if (!preg_match("/^[\p{L}\s'\-]+$/u", $lastName)) {
+            echo json_encode(['success' => false, 'message' => 'Last name can only contain letters.']);
+            exit;
+        }
+        if ($contact === '') {
+            echo json_encode(['success' => false, 'message' => 'Please enter a contact number.']);
             exit;
         }
         if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -83,10 +114,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             exit;
         }
 
-        $fullContact = '+63' . $contact;
-
-        $stmt = $conn->prepare("UPDATE admin SET first_name = ?, last_name = ?, contact_number = ?, email = ? WHERE admin_id = ?");
-        $stmt->bind_param("ssssi", $firstName, $lastName, $fullContact, $email, $adminId);
+        $stmt = $conn->prepare("UPDATE admins SET first_name = ?, last_name = ?, contact_number = ?, email = ? WHERE admin_id = ?");
+        $stmt->bind_param("ssssi", $firstName, $lastName, $contact, $email, $adminId);
         $ok = $stmt->execute();
         $errNo = $stmt->errno;
         $stmt->close();
@@ -104,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         if (isset($_FILES['profile_image_file']) && $_FILES['profile_image_file']['error'] !== UPLOAD_ERR_NO_FILE) {
             $imagePath = handleProfileImageUpload($_FILES['profile_image_file']);
             if ($imagePath) {
-                $imgStmt = $conn->prepare("UPDATE admin SET profile_image = ? WHERE admin_id = ?");
+                $imgStmt = $conn->prepare("UPDATE admins SET profile_image = ? WHERE admin_id = ?");
                 $imgStmt->bind_param("si", $imagePath, $adminId);
                 $imgStmt->execute();
                 $imgStmt->close();
@@ -112,7 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $hasNewImage = true;
             }
         } elseif ($removeImage) {
-            $imgStmt = $conn->prepare("UPDATE admin SET profile_image = NULL WHERE admin_id = ?");
+            $imgStmt = $conn->prepare("UPDATE admins SET profile_image = NULL WHERE admin_id = ?");
             $imgStmt->bind_param("i", $adminId);
             $imgStmt->execute();
             $imgStmt->close();
@@ -145,8 +174,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             echo json_encode(['success' => false, 'message' => 'Please enter a new password.']);
             exit;
         }
-        if (strlen($newPw) < 8) {
-            echo json_encode(['success' => false, 'message' => 'New password must be at least 8 characters.']);
+        if (!isStrongPassword($newPw)) {
+            echo json_encode(['success' => false, 'message' => 'New password must be at least 8 characters and include an uppercase letter, a number, and a symbol.']);
             exit;
         }
         if ($newPw !== $confirmPw) {
@@ -154,7 +183,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             exit;
         }
 
-        $stmt = $conn->prepare("SELECT password FROM admin WHERE admin_id = ? LIMIT 1");
+        $stmt = $conn->prepare("SELECT password FROM admins WHERE admin_id = ? LIMIT 1");
         $stmt->bind_param("i", $adminId);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
@@ -166,7 +195,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             exit;
         }
 
-        $updateStmt = $conn->prepare("UPDATE admin SET password = ? WHERE admin_id = ?");
+        $updateStmt = $conn->prepare("UPDATE admins SET password = ? WHERE admin_id = ?");
         $updateStmt->bind_param("si", $newPw, $adminId);
         $ok = $updateStmt->execute();
         $updateStmt->close();
@@ -254,6 +283,17 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
         border-color: #f87171;
       }
 
+      #toast {
+        opacity: 0;
+        transform: translate(-50%, 8px);
+        transition: opacity 0.25s ease, transform 0.25s ease;
+      }
+
+      #toast.toast-visible {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+
       #sidebar {
         position: fixed;
         top: 0;
@@ -324,9 +364,9 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
               </svg>
             </button>
             <nav class="flex items-center gap-1.5 text-xs text-gray-500 min-w-0" aria-label="Breadcrumb">
-              <a href="./dashboard.php" class="hover:text-emerald-600 shrink-0">Dashboard</a>
+              <a href="./dashboard.php" class="hover:text-gray-900 shrink-0">Dashboard</a>
               <span class="text-gray-300 shrink-0">/</span>
-              <span class="text-gray-700 font-medium truncate">My Account</span>
+              <span class="text-emerald-600 font-medium truncate">My Account</span>
             </nav>
           </div>
         </div>
@@ -699,10 +739,7 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
 
           <div>
             <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Contact Number</label>
-            <div class="relative">
-              <div class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium pointer-events-none">+63</div>
-              <input type="tel" id="fieldContact" maxlength="10" placeholder="9XX XXX XXXX" class="w-full pl-10 pr-3 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600" style="border-radius: 3px" />
-            </div>
+            <input type="tel" id="fieldContact" placeholder="0917 123 4567" class="w-full px-3 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600" style="border-radius: 3px" />
           </div>
 
           <div>
@@ -714,7 +751,7 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
           <button id="cancelEditProfileBtn" class="flex-1 py-2.5 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors" style="border-radius: 3px">
             Cancel
           </button>
-          <button id="saveEditProfileBtn" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors" style="border-radius: 3px">
+          <button id="saveEditProfileBtn" disabled class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors" style="border-radius: 3px">
             Save Changes
           </button>
         </div>
@@ -753,7 +790,12 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
           <div>
             <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Current Password</label>
             <div class="relative">
-              <input type="password" id="fieldCurrentPassword" placeholder="Enter current password" class="w-full px-3 py-2.5 pr-9 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600" style="border-radius: 3px" />
+              <div class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                </svg>
+              </div>
+              <input type="password" id="fieldCurrentPassword" placeholder="Enter current password" class="w-full pl-9 pr-9 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600" style="border-radius: 3px" />
               <button
                 type="button"
                 id="toggleCurrentPasswordBtn"
@@ -786,7 +828,12 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
           <div>
             <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">New Password</label>
             <div class="relative">
-              <input type="password" id="fieldNewPassword" placeholder="At least 8 characters" class="w-full px-3 py-2.5 pr-9 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600" style="border-radius: 3px" />
+              <div class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                </svg>
+              </div>
+              <input type="password" id="fieldNewPassword" placeholder="Enter your new password" class="w-full pl-9 pr-9 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600" style="border-radius: 3px" />
               <button
                 type="button"
                 id="toggleNewPasswordBtn"
@@ -814,6 +861,9 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
                 </svg>
               </button>
             </div>
+            <p class="text-[10px] text-gray-400 mt-1.5">
+              At least 8 characters, with an uppercase letter, a number, and a symbol.
+            </p>
             <div class="mt-2">
               <div class="flex gap-1">
                 <div class="h-1 flex-1 bg-gray-200 transition-colors" style="border-radius: 999px" id="pwBar1"></div>
@@ -828,7 +878,12 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
           <div>
             <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Confirm New Password</label>
             <div class="relative">
-              <input type="password" id="fieldConfirmPassword" placeholder="Repeat new password" class="w-full px-3 py-2.5 pr-9 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600" style="border-radius: 3px" />
+              <div class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                </svg>
+              </div>
+              <input type="password" id="fieldConfirmPassword" placeholder="Repeat new password" class="w-full pl-9 pr-9 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600" style="border-radius: 3px" />
               <button
                 type="button"
                 id="toggleConfirmPasswordBtn"
@@ -899,11 +954,21 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
       </div>
     </div>
 
+    <div
+      id="toast"
+      class="hidden items-center gap-2 fixed left-1/2 bottom-6 z-40 -translate-x-1/2 max-w-[calc(100%-2rem)] bg-gray-900 text-white text-xs font-medium px-4 py-2.5 shadow-lg"
+      style="border-radius: 6px">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-emerald-400 shrink-0">
+        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+      </svg>
+      <span id="toastMessage" class="truncate"></span>
+    </div>
+
     <script>
       let adminAccount = {
         firstName: <?php echo json_encode($initialProfile['first_name']); ?>,
         lastName: <?php echo json_encode($initialProfile['last_name']); ?>,
-        contactNumber: <?php echo json_encode($initialProfile['contact_local']); ?>,
+        contactNumber: <?php echo json_encode($initialProfile['contact_number']); ?>,
         email: <?php echo json_encode($initialProfile['email']); ?>,
         memberSince: <?php echo json_encode($initialProfile['member_since']); ?>,
         profileImage: <?php echo json_encode($initialProfile['profile_image']); ?>,
@@ -938,6 +1003,35 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
           .replace(/>/g, "&gt;")
           .replace(/"/g, "&quot;")
           .replace(/'/g, "&#039;");
+      }
+
+      let toastHideTimeout = null;
+      let toastRemoveTimeout = null;
+
+      function showToast(message) {
+        const toast = document.getElementById("toast");
+        const toastMessage = document.getElementById("toastMessage");
+        toastMessage.textContent = message;
+
+        if (toastHideTimeout) clearTimeout(toastHideTimeout);
+        if (toastRemoveTimeout) clearTimeout(toastRemoveTimeout);
+
+        toast.classList.remove("hidden");
+        toast.classList.add("flex");
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            toast.classList.add("toast-visible");
+          });
+        });
+
+        toastHideTimeout = setTimeout(() => {
+          toast.classList.remove("toast-visible");
+          toastRemoveTimeout = setTimeout(() => {
+            toast.classList.add("hidden");
+            toast.classList.remove("flex");
+          }, 250);
+        }, 2000);
       }
 
       function getInitials(first, last) {
@@ -977,6 +1071,20 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
         }
       }
 
+      let initialEditProfileState = {};
+
+      function checkForEditProfileChanges() {
+        const changed =
+          document.getElementById("fieldFirstName").value !== initialEditProfileState.firstName ||
+          document.getElementById("fieldLastName").value !== initialEditProfileState.lastName ||
+          document.getElementById("fieldContact").value !== initialEditProfileState.contact ||
+          document.getElementById("fieldEmail").value !== initialEditProfileState.email ||
+          currentProfileImageFile !== null ||
+          removeImageFlag;
+
+        document.getElementById("saveEditProfileBtn").disabled = !changed;
+      }
+
       function openEditProfileModal() {
         document.getElementById("fieldFirstName").value = adminAccount.firstName;
         document.getElementById("fieldLastName").value = adminAccount.lastName;
@@ -994,6 +1102,13 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
           adminAccount.profileImage || null,
           getInitials(adminAccount.firstName, adminAccount.lastName),
         );
+        initialEditProfileState = {
+          firstName: adminAccount.firstName,
+          lastName: adminAccount.lastName,
+          contact: adminAccount.contactNumber,
+          email: adminAccount.email,
+        };
+        document.getElementById("saveEditProfileBtn").disabled = true;
         document.getElementById("editProfileModal").classList.remove("hidden");
         document.body.style.overflow = "hidden";
       }
@@ -1013,10 +1128,22 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
       }
 
+      function toTitleCase(str) {
+        return str
+          .trim()
+          .replace(/\s+/g, " ")
+          .toLowerCase()
+          .replace(/(^|[\s'-])\p{L}/gu, (c) => c.toUpperCase());
+      }
+
+      function isValidName(val) {
+        return /^[\p{L}\s'-]+$/u.test(val);
+      }
+
       async function saveEditProfile() {
         const firstName = document.getElementById("fieldFirstName").value.trim();
         const lastName = document.getElementById("fieldLastName").value.trim();
-        const contact = document.getElementById("fieldContact").value.replace(/\D/g, "").slice(0, 10);
+        const contact = document.getElementById("fieldContact").value.trim();
         const email = document.getElementById("fieldEmail").value.trim();
 
         document
@@ -1030,13 +1157,23 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
           document.getElementById("fieldFirstName").classList.add("error");
           return;
         }
+        if (!isValidName(firstName)) {
+          showEditProfileError("First name can only contain letters.");
+          document.getElementById("fieldFirstName").classList.add("error");
+          return;
+        }
         if (!lastName) {
           showEditProfileError("Last name is required.");
           document.getElementById("fieldLastName").classList.add("error");
           return;
         }
-        if (!contact || contact.length < 10 || !contact.startsWith("9")) {
-          showEditProfileError("Please enter a valid 10-digit contact number starting with 9.");
+        if (!isValidName(lastName)) {
+          showEditProfileError("Last name can only contain letters.");
+          document.getElementById("fieldLastName").classList.add("error");
+          return;
+        }
+        if (!contact) {
+          showEditProfileError("Please enter a contact number.");
           document.getElementById("fieldContact").classList.add("error");
           return;
         }
@@ -1090,6 +1227,7 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
 
         renderProfile();
         closeEditProfileModal();
+        showToast("Profile updated successfully");
       }
 
       function resetPasswordModal() {
@@ -1171,6 +1309,15 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
         }
       }
 
+      function isStrongPassword(pw) {
+        return (
+          pw.length >= 8 &&
+          /[A-Z]/.test(pw) &&
+          /[0-9]/.test(pw) &&
+          /[^A-Za-z0-9]/.test(pw)
+        );
+      }
+
       async function saveChangePassword() {
         const currentPw = document.getElementById("fieldCurrentPassword").value;
         const newPw = document.getElementById("fieldNewPassword").value;
@@ -1192,8 +1339,8 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
           document.getElementById("fieldNewPassword").classList.add("error");
           return;
         }
-        if (newPw.length < 8) {
-          showPasswordError("New password must be at least 8 characters.");
+        if (!isStrongPassword(newPw)) {
+          showPasswordError("New password must be at least 8 characters and include an uppercase letter, a number, and a symbol.");
           document.getElementById("fieldNewPassword").classList.add("error");
           return;
         }
@@ -1221,7 +1368,7 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
         }
 
         closeChangePasswordModal();
-        alert("Your password has been updated.");
+        showToast("Password updated successfully");
       }
 
       function openLogoutModal() {
@@ -1290,6 +1437,7 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
           const reader = new FileReader();
           reader.onload = (ev) => {
             updateEditProfilePreview(ev.target.result, null);
+            checkForEditProfileChanges();
           };
           reader.readAsDataURL(file);
         });
@@ -1300,6 +1448,49 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
           const first = document.getElementById("fieldFirstName").value.trim();
           const last = document.getElementById("fieldLastName").value.trim();
           updateEditProfilePreview(null, getInitials(first || "?", last || ""));
+          checkForEditProfileChanges();
+        });
+
+        ["fieldFirstName", "fieldLastName", "fieldContact", "fieldEmail"].forEach((id) => {
+          document.getElementById(id).addEventListener("input", checkForEditProfileChanges);
+        });
+
+        [document.getElementById("fieldFirstName"), document.getElementById("fieldLastName")].forEach((el) => {
+          el.addEventListener("input", () => {
+            const cursorPos = el.selectionStart;
+            const cleaned = el.value.replace(/[^\p{L}\s'-]/gu, "");
+            if (cleaned !== el.value) {
+              const removedCount = el.value.length - cleaned.length;
+              el.value = cleaned;
+              const newPos = Math.max(0, cursorPos - removedCount);
+              el.setSelectionRange(newPos, newPos);
+            }
+          });
+
+          el.addEventListener("blur", () => {
+            if (el.value.trim()) {
+              el.value = toTitleCase(el.value);
+              checkForEditProfileChanges();
+            }
+          });
+        });
+
+        document.getElementById("fieldEmail").addEventListener("input", (e) => {
+          const cursorPos = e.target.selectionStart;
+          const cleaned = e.target.value.replace(/\s/g, "");
+          if (cleaned !== e.target.value) {
+            const removedCount = e.target.value.length - cleaned.length;
+            e.target.value = cleaned;
+            const newPos = Math.max(0, cursorPos - removedCount);
+            e.target.setSelectionRange(newPos, newPos);
+          }
+        });
+
+        document.getElementById("fieldEmail").addEventListener("blur", (e) => {
+          if (e.target.value.trim()) {
+            e.target.value = e.target.value.trim().toLowerCase();
+            checkForEditProfileChanges();
+          }
         });
 
         document.getElementById("changePasswordBtn").addEventListener("click", openChangePasswordModal);

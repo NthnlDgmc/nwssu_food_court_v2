@@ -3,7 +3,7 @@
 -- Complete Database Schema
 -- =====================================================
 
-CREATE TABLE admin (
+CREATE TABLE admins (
     admin_id INT AUTO_INCREMENT PRIMARY KEY,
     profile_image VARCHAR(255) NULL,
     first_name VARCHAR(100) NOT NULL,
@@ -43,7 +43,7 @@ CREATE TABLE delivery_staff (
 
 CREATE TABLE customers (
     customer_id INT AUTO_INCREMENT PRIMARY KEY,
-    customer_type ENUM('student', 'faculty', 'staff', 'outsider') DEFAULT 'student',
+    customer_type ENUM('student', 'faculty', 'staff', 'guest') DEFAULT 'student',
     profile_image VARCHAR(255) NULL,
     id_number VARCHAR(50) NULL,
     first_name VARCHAR(100) NOT NULL,
@@ -84,7 +84,6 @@ CREATE TABLE stalls (
     status ENUM('open', 'closed') DEFAULT 'open',
     owner_id INT NULL,
     staff_id INT NULL,
-    delivery_fee DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -138,41 +137,11 @@ CREATE TABLE carts (
 );
 
 
-CREATE TABLE orders (
-    order_id INT AUTO_INCREMENT PRIMARY KEY,
-    customer_id INT NOT NULL,
-    stall_id INT NOT NULL,
-    staff_id INT NULL,
-    order_type ENUM('pickup', 'delivery') NOT NULL DEFAULT 'delivery',
-    status ENUM(
-    'pending',
-    'preparing',
-    'ready_for_pickup',
-    'ready_for_dispatch',
-    'collected',
-    'out_for_delivery',
-    'delivered',
-    'completed',
-    'cancelled'
-) DEFAULT 'pending',
-    payment_method ENUM('cash', 'gcash', 'paymaya') NOT NULL DEFAULT 'cash',
-    total_amount DECIMAL(10, 2) NOT NULL,
-    total_delivery_fee DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-    grand_total DECIMAL(10, 2) NOT NULL,
-    drop_off_location VARCHAR(255) NULL,
-    note TEXT NULL,
-    delivery_proof_image VARCHAR(255) NULL,
-    proof_captured_at TIMESTAMP NULL,
-    customer_confirmed ENUM('pending', 'confirmed', 'issue') DEFAULT 'pending',
-    customer_confirmed_at TIMESTAMP NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE RESTRICT,
-    FOREIGN KEY (stall_id) REFERENCES stalls(stall_id) ON DELETE RESTRICT,
-    FOREIGN KEY (staff_id) REFERENCES delivery_staff(staff_id) ON DELETE SET NULL
-);
-
-
+-- NOTE: This table merges the two conflicting `orders` definitions that were
+-- pasted (one with the 9-status flow + customer_confirmed, one with owner_id +
+-- cancel_reason/cancelled_at). The actual PHP code across the system
+-- (orders.php, deliveries.php, stall-dashboard.php, order.php) requires BOTH
+-- sets of columns together, so they are combined here into a single table.
 CREATE TABLE orders (
     order_id INT AUTO_INCREMENT PRIMARY KEY,
     customer_id INT NOT NULL,
@@ -184,8 +153,10 @@ CREATE TABLE orders (
         'pending',
         'preparing',
         'ready_for_pickup',
-        'picked_up',
+        'ready_for_dispatch',
+        'collected',
         'out_for_delivery',
+        'delivered',
         'completed',
         'cancelled'
     ) DEFAULT 'pending',

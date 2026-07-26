@@ -9,7 +9,7 @@ if (!isset($_SESSION['admin_id'])) {
 
 $adminId = $_SESSION['admin_id'];
 
-$adminStmt = $conn->prepare("SELECT first_name, last_name, profile_image FROM admin WHERE admin_id = ? LIMIT 1");
+$adminStmt = $conn->prepare("SELECT first_name, last_name, profile_image FROM admins WHERE admin_id = ? LIMIT 1");
 $adminStmt->bind_param("s", $adminId);
 $adminStmt->execute();
 $adminResult = $adminStmt->get_result();
@@ -111,7 +111,7 @@ function ownerEmailTakenByOther($conn, $email, $excludeOwnerId = 0)
 {
   if ($email === '' || $email === null) return false;
 
-  $stmt = $conn->prepare("SELECT admin_id FROM admin WHERE email = ? LIMIT 1");
+  $stmt = $conn->prepare("SELECT admin_id FROM admins WHERE email = ? LIMIT 1");
   $stmt->bind_param("s", $email);
   $stmt->execute();
   $row = $stmt->get_result()->fetch_assoc();
@@ -530,9 +530,9 @@ $conn->close();
             </svg>
           </button>
           <nav class="flex items-center gap-1.5 text-xs text-gray-500 min-w-0" aria-label="Breadcrumb">
-            <a href="./dashboard.php" class="hover:text-emerald-600 shrink-0">Dashboard</a>
+            <a href="./dashboard.php" class="hover:text-gray-900 shrink-0">Dashboard</a>
             <span class="text-gray-300 shrink-0">/</span>
-            <span class="text-gray-700 font-medium truncate">Stall Owners</span>
+            <span class="text-emerald-600 font-medium truncate">Stall Owners</span>
           </nav>
         </div>
         <button
