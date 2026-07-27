@@ -972,7 +972,7 @@ $conn->close();
       }
     }
 
-    function setupPushPromptBanner() {
+    async function setupPushPromptBanner() {
       if ("serviceWorker" in navigator) {
         navigator.serviceWorker.register("../service-worker.js");
       }
@@ -982,6 +982,22 @@ $conn->close();
       }
 
       if (Notification.permission === "granted") {
+        const registration = await navigator.serviceWorker.getRegistration();
+        const existingSubscription = registration && (await registration.pushManager.getSubscription());
+
+        if (existingSubscription) {
+          await fetch("../save-push-subscription.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(existingSubscription),
+          });
+          return;
+        }
+
+        if (localStorage.getItem("notificationsOptedOut") === "1") {
+          return;
+        }
+
         subscribeToPush();
         return;
       }
@@ -1001,6 +1017,7 @@ $conn->close();
         const granted = await Notification.requestPermission();
         banner.classList.add("hidden");
         if (granted === "granted") {
+          localStorage.removeItem("notificationsOptedOut");
           await subscribeToPush();
         }
       });

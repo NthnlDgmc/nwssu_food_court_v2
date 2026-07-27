@@ -9,6 +9,18 @@ if (!isset($_SESSION['customer_id'])) {
 
 $customerId = $_SESSION['customer_id'];
 
+$statusCheckStmt = $conn->prepare("SELECT status FROM customers WHERE customer_id = ? LIMIT 1");
+$statusCheckStmt->bind_param("i", $customerId);
+$statusCheckStmt->execute();
+$statusCheckRow = $statusCheckStmt->get_result()->fetch_assoc();
+$statusCheckStmt->close();
+
+if (!$statusCheckRow || $statusCheckRow['status'] === 'inactive') {
+    session_destroy();
+    header('Location: ../auth/login.php?deactivated=1');
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'toggle_favorite') {
     header('Content-Type: application/json');
 
@@ -151,7 +163,7 @@ if (!$customer) {
 
 $favoritesResult = $conn->prepare("
     SELECT f.favorite_id, mi.menu_item_id, mi.item_name, mi.price, mi.image, mi.status AS item_status,
-           s.stall_id, s.stall_name, s.status AS stall_status,
+           s.stall_id, s.stall_name, s.status AS stall_status, s.opens_at, s.closes_at,
            (mi.owner_id = s.owner_id) AS owner_matches
     FROM favorites f
     JOIN menu_items mi ON f.menu_item_id = mi.menu_item_id
@@ -162,6 +174,17 @@ $favoritesResult = $conn->prepare("
 $favoritesResult->bind_param("i", $customerId);
 $favoritesResult->execute();
 $favoritesRows = $favoritesResult->get_result();
+
+$currentTime = date('H:i:s');
+
+function isStallOpenNow($opensAt, $closesAt, $currentTime)
+{
+    if (!$opensAt || !$closesAt) {
+        return true;
+    }
+    return $currentTime >= $opensAt && $currentTime <= $closesAt;
+}
+
 $favoriteItems = [];
 while ($row = $favoritesRows->fetch_assoc()) {
     $favoriteItems[] = [
@@ -173,7 +196,8 @@ while ($row = $favoritesRows->fetch_assoc()) {
         'stall_name' => $row['stall_name'],
         'is_available' => $row['item_status'] === 'available'
             && $row['stall_status'] === 'open'
-            && (int) $row['owner_matches'] === 1,
+            && (int) $row['owner_matches'] === 1
+            && isStallOpenNow($row['opens_at'], $row['closes_at'], $currentTime),
     ];
 }
 $favoritesResult->close();

@@ -17,6 +17,8 @@ if ($existingLockoutUntil > time()) {
     $pageLoadLockoutRemaining = $existingLockoutUntil - time();
 }
 
+$showDeactivatedMessage = isset($_GET['deactivated']);
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
 
@@ -643,6 +645,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (pageLoadLockoutRemaining > 0) {
         showError("Too many failed attempts. Please wait " + pageLoadLockoutRemaining + " seconds before trying again.");
         startLoginLockout(pageLoadLockoutRemaining);
+      }
+
+      const showDeactivatedMessage = <?php echo $showDeactivatedMessage ? 'true' : 'false'; ?>;
+      if (showDeactivatedMessage) {
+        showError("Your account has been deactivated. Please contact support.");
       }
 
       if ("serviceWorker" in navigator) {

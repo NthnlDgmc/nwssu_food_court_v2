@@ -84,6 +84,8 @@ CREATE TABLE stalls (
     status ENUM('open', 'closed') DEFAULT 'open',
     owner_id INT NULL,
     staff_id INT NULL,
+    opens_at TIME NULL,
+    closes_at TIME NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -174,7 +176,7 @@ CREATE TABLE orders (
     customer_confirmed_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE RESTRICT,
+    FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE CASCADE,
     FOREIGN KEY (stall_id) REFERENCES stalls(stall_id) ON DELETE RESTRICT,
     FOREIGN KEY (owner_id) REFERENCES stall_owners(owner_id) ON DELETE SET NULL,
     FOREIGN KEY (staff_id) REFERENCES delivery_staff(staff_id) ON DELETE SET NULL

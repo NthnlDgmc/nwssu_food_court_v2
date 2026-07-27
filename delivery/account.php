@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../config/database.php';
+require_once '../config/vapid.php';
 
 if (!isset($_SESSION['staff_id'])) {
   header('Location: ../auth/login.php');
@@ -242,6 +243,17 @@ if (!$initialProfile) {
     input.error {
       border-color: #f87171;
     }
+
+    #toast {
+      opacity: 0;
+      transform: translate(-50%, 8px);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+
+    #toast.toast-visible {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
   </style>
 </head>
 
@@ -338,14 +350,15 @@ if (!$initialProfile) {
               </svg>
             </button>
             <button
-              class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
-              data-info="Notification preferences are coming soon.">
+              id="notificationsBtn"
+              class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">
               <span class="w-8 h-8 bg-gray-100 flex items-center justify-center shrink-0 rounded-[3px]">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
                 </svg>
               </span>
               <span class="flex-1 text-xs font-medium text-gray-700">Notifications</span>
+              <span id="notifStatusBadge" class="text-[10px] text-gray-400 shrink-0">Off</span>
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-300 shrink-0">
                 <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
               </svg>
@@ -701,6 +714,36 @@ if (!$initialProfile) {
   </div>
 
   <div
+    id="notificationsModal"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center px-4">
+    <div class="modal-overlay absolute inset-0" id="closeNotificationsOverlay"></div>
+    <div
+      class="bg-white w-full max-w-md max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl rounded-md">
+      <div class="p-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
+        <h2 class="font-bold text-gray-800 text-sm">Notifications</h2>
+        <button id="closeNotificationsBtn" class="p-1 hover:bg-gray-100 rounded-[3px]">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div class="p-4">
+        <div class="flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-xs font-semibold text-gray-800">Push Notifications</p>
+            <p id="notifStatusLabel" class="text-[10px] text-gray-400 mt-0.5">Off</p>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer shrink-0">
+            <input type="checkbox" id="notifToggle" class="sr-only peer" />
+            <div class="w-11 h-6 bg-gray-300 peer-checked:bg-emerald-500 rounded-full transition-colors"></div>
+            <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5 shadow"></div>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
     id="logoutModal"
     class="fixed inset-0 z-[60] hidden flex items-center justify-center px-4">
     <div class="modal-overlay absolute inset-0" id="closeLogoutOverlay"></div>
@@ -724,6 +767,15 @@ if (!$initialProfile) {
         </button>
       </div>
     </div>
+  </div>
+
+  <div
+    id="toast"
+    class="hidden items-center gap-2 fixed left-1/2 bottom-20 z-40 -translate-x-1/2 max-w-[calc(100%-2rem)] bg-gray-900 text-white text-xs font-medium px-4 py-2.5 shadow-lg rounded-[6px]">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-emerald-400 shrink-0">
+      <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+    </svg>
+    <span id="toastMessage" class="truncate"></span>
   </div>
 
   <script>
@@ -797,8 +849,179 @@ if (!$initialProfile) {
         .replace(/'/g, "&#039;");
     }
 
+    let toastHideTimeout = null;
+    let toastRemoveTimeout = null;
+
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      const toastMessage = document.getElementById("toastMessage");
+      toastMessage.textContent = message;
+
+      if (toastHideTimeout) clearTimeout(toastHideTimeout);
+      if (toastRemoveTimeout) clearTimeout(toastRemoveTimeout);
+
+      toast.classList.remove("hidden");
+      toast.classList.add("flex");
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          toast.classList.add("toast-visible");
+        });
+      });
+
+      toastHideTimeout = setTimeout(() => {
+        toast.classList.remove("toast-visible");
+        toastRemoveTimeout = setTimeout(() => {
+          toast.classList.add("hidden");
+          toast.classList.remove("flex");
+        }, 250);
+      }, 2000);
+    }
+
     function getInitials(first, last) {
       return ((first[0] || "") + (last[0] || "")).toUpperCase();
+    }
+
+    const VAPID_PUBLIC_KEY = "<?php echo VAPID_PUBLIC_KEY; ?>";
+
+    function urlBase64ToUint8Array(base64String) {
+      const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+      const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+      const rawData = window.atob(base64);
+      const outputArray = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; i++) {
+        outputArray[i] = rawData.charCodeAt(i);
+      }
+      return outputArray;
+    }
+
+    async function subscribeToPush() {
+      const registration = await navigator.serviceWorker.register("../service-worker.js");
+      await navigator.serviceWorker.ready;
+
+      const existingSubscription = await registration.pushManager.getSubscription();
+      const subscription = existingSubscription || (await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      }));
+
+      await fetch("../save-push-subscription.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(subscription),
+      });
+
+      return true;
+    }
+
+    async function unsubscribeFromPush() {
+      if (!("serviceWorker" in navigator)) return;
+
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) return;
+
+      const subscription = await registration.pushManager.getSubscription();
+      if (!subscription) return;
+
+      await fetch("../remove-push-subscription.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: subscription.endpoint }),
+      });
+
+      await subscription.unsubscribe();
+    }
+
+    function openNotificationsModal() {
+      document.getElementById("notificationsModal").classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeNotificationsModal() {
+      document.getElementById("notificationsModal").classList.add("hidden");
+      document.body.style.overflow = "";
+    }
+
+    async function setupNotificationToggle() {
+      const toggle = document.getElementById("notifToggle");
+      const label = document.getElementById("notifStatusLabel");
+      const badge = document.getElementById("notifStatusBadge");
+
+      document.getElementById("notificationsBtn").addEventListener("click", openNotificationsModal);
+      document.getElementById("closeNotificationsBtn").addEventListener("click", closeNotificationsModal);
+      document.getElementById("closeNotificationsOverlay").addEventListener("click", closeNotificationsModal);
+
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        toggle.disabled = true;
+        label.textContent = "Not supported on this device";
+        badge.textContent = "Unsupported";
+        return;
+      }
+
+      let isSubscribed = false;
+      if (Notification.permission === "granted") {
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (registration) {
+          const subscription = await registration.pushManager.getSubscription();
+          if (subscription) {
+            isSubscribed = true;
+            await fetch("../save-push-subscription.php", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(subscription),
+            });
+          }
+        }
+      }
+
+      toggle.checked = isSubscribed;
+      label.textContent = isSubscribed ? "On" : "Off";
+      badge.textContent = isSubscribed ? "On" : "Off";
+
+      toggle.addEventListener("change", async () => {
+        toggle.disabled = true;
+
+        if (toggle.checked) {
+          if (Notification.permission === "denied") {
+            toggle.checked = false;
+            toggle.disabled = false;
+            alert("Notifications are blocked in your browser settings. Please enable them manually to turn this on.");
+            return;
+          }
+
+          const permission = Notification.permission === "granted" ?
+            "granted" :
+            await Notification.requestPermission();
+
+          if (permission !== "granted") {
+            toggle.checked = false;
+            toggle.disabled = false;
+            return;
+          }
+
+          try {
+            await subscribeToPush();
+            localStorage.removeItem("notificationsOptedOut");
+            label.textContent = "On";
+            badge.textContent = "On";
+            showToast("Notifications turned on");
+          } catch (err) {
+            toggle.checked = false;
+          }
+        } else {
+          try {
+            await unsubscribeFromPush();
+            localStorage.setItem("notificationsOptedOut", "1");
+            label.textContent = "Off";
+            badge.textContent = "Off";
+            showToast("Notifications turned off");
+          } catch (err) {
+            toggle.checked = true;
+          }
+        }
+
+        toggle.disabled = false;
+      });
     }
 
     function renderProfile() {
@@ -1165,6 +1388,7 @@ if (!$initialProfile) {
       setupChangePasswordModal();
       setupInfoRows();
       setupLogoutModal();
+      setupNotificationToggle();
     }
 
     window.addEventListener("load", init);

@@ -10,6 +10,18 @@ if (!isset($_SESSION['customer_id'])) {
 
 $customerId = $_SESSION['customer_id'];
 
+$statusCheckStmt = $conn->prepare("SELECT status FROM customers WHERE customer_id = ? LIMIT 1");
+$statusCheckStmt->bind_param("i", $customerId);
+$statusCheckStmt->execute();
+$statusCheckRow = $statusCheckStmt->get_result()->fetch_assoc();
+$statusCheckStmt->close();
+
+if (!$statusCheckRow || $statusCheckRow['status'] === 'inactive') {
+  session_destroy();
+  header('Location: ../auth/login.php?deactivated=1');
+  exit;
+}
+
 function formatRelativeTime($datetime)
 {
   $now = time();
@@ -252,15 +264,29 @@ while ($row = $stallsResult->fetch_assoc()) {
 }
 
 $menuItemsResult = $conn->query("
-    SELECT mi.menu_item_id, mi.item_name, mi.price, mi.image, mi.stall_id, s.stall_name, mi.category_id, c.category_name
+    SELECT mi.menu_item_id, mi.item_name, mi.price, mi.image, mi.stall_id, s.stall_name, mi.category_id, c.category_name, s.opens_at, s.closes_at
     FROM menu_items mi
     JOIN stalls s ON mi.stall_id = s.stall_id
     JOIN categories c ON mi.category_id = c.category_id
-    WHERE mi.status = 'available' AND s.status = 'open' AND mi.owner_id = s.owner_id
+    WHERE mi.status = 'available' AND s.status = 'open' AND c.status = 'active' AND mi.owner_id = s.owner_id
     ORDER BY mi.created_at DESC
 ");
+
+$currentTime = date('H:i:s');
+
+function isStallOpenNow($opensAt, $closesAt, $currentTime)
+{
+  if (!$opensAt || !$closesAt) {
+    return true;
+  }
+  return $currentTime >= $opensAt && $currentTime <= $closesAt;
+}
+
 $menuItems = [];
 while ($row = $menuItemsResult->fetch_assoc()) {
+  if (!isStallOpenNow($row['opens_at'], $row['closes_at'], $currentTime)) {
+    continue;
+  }
   $menuItems[] = [
     'menu_item_id' => (int) $row['menu_item_id'],
     'item_name' => $row['item_name'],
@@ -936,7 +962,7 @@ $avatarInitial = mb_strtoupper(mb_substr($firstName, 0, 1));
       }
     }
 
-    function setupPushPromptBanner() {
+    async function setupPushPromptBanner() {
       if ("serviceWorker" in navigator) {
         navigator.serviceWorker.register("../service-worker.js");
       }
@@ -946,6 +972,22 @@ $avatarInitial = mb_strtoupper(mb_substr($firstName, 0, 1));
       }
 
       if (Notification.permission === "granted") {
+        const registration = await navigator.serviceWorker.getRegistration();
+        const existingSubscription = registration && (await registration.pushManager.getSubscription());
+
+        if (existingSubscription) {
+          await fetch("../save-push-subscription.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(existingSubscription),
+          });
+          return;
+        }
+
+        if (localStorage.getItem("notificationsOptedOut") === "1") {
+          return;
+        }
+
         subscribeToPush();
         return;
       }
@@ -965,6 +1007,7 @@ $avatarInitial = mb_strtoupper(mb_substr($firstName, 0, 1));
         const granted = await Notification.requestPermission();
         banner.classList.add("hidden");
         if (granted === "granted") {
+          localStorage.removeItem("notificationsOptedOut");
           await subscribeToPush();
         }
       });

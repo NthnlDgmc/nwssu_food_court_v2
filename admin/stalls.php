@@ -101,15 +101,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
   if ($action === 'add_stall') {
     $name = trim($_POST['name'] ?? '');
-    $status = ($_POST['status'] ?? 'open') === 'closed' ? 'closed' : 'open';
 
     if ($name === '') {
       echo json_encode(['success' => false, 'message' => 'Stall name is required.']);
       exit;
     }
 
-    $stmt = $conn->prepare("INSERT INTO stalls (stall_name, status) VALUES (?, ?)");
-    $stmt->bind_param("ss", $name, $status);
+    $stmt = $conn->prepare("INSERT INTO stalls (stall_name) VALUES (?)");
+    $stmt->bind_param("s", $name);
     $ok = $stmt->execute();
     $stmt->close();
 
@@ -123,15 +122,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
   if ($action === 'edit_stall') {
     $stallId = (int) ($_POST['stall_id'] ?? 0);
     $name = trim($_POST['name'] ?? '');
-    $status = ($_POST['status'] ?? 'open') === 'closed' ? 'closed' : 'open';
 
     if ($stallId <= 0 || $name === '') {
       echo json_encode(['success' => false, 'message' => 'Stall name is required.']);
       exit;
     }
 
-    $stmt = $conn->prepare("UPDATE stalls SET stall_name = ?, status = ? WHERE stall_id = ?");
-    $stmt->bind_param("ssi", $name, $status, $stallId);
+    $stmt = $conn->prepare("UPDATE stalls SET stall_name = ? WHERE stall_id = ?");
+    $stmt->bind_param("si", $name, $stallId);
     $ok = $stmt->execute();
     $stmt->close();
 
@@ -680,34 +678,6 @@ $conn->close();
             style="border-radius: 3px" />
         </div>
 
-        <div>
-          <label
-            class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Status</label>
-          <div class="flex gap-2">
-            <label
-              class="flex items-center gap-2 p-2.5 flex-1 border border-gray-200 cursor-pointer hover:border-emerald-500 transition-all has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50/40"
-              style="border-radius: 3px">
-              <input
-                type="radio"
-                name="stallStatus"
-                value="open"
-                checked
-                class="accent-emerald-600 shrink-0" />
-              <span class="text-xs font-medium text-gray-700">Open</span>
-            </label>
-            <label
-              class="flex items-center gap-2 p-2.5 flex-1 border border-gray-200 cursor-pointer hover:border-red-400 transition-all has-[:checked]:border-red-400 has-[:checked]:bg-red-50/40"
-              style="border-radius: 3px">
-              <input
-                type="radio"
-                name="stallStatus"
-                value="closed"
-                class="accent-red-500 shrink-0" />
-              <span class="text-xs font-medium text-gray-700">Closed</span>
-            </label>
-          </div>
-        </div>
-
         <div
           id="stallFormError"
           class="hidden items-center gap-2 p-3 bg-red-50 border border-red-200"
@@ -1213,9 +1183,6 @@ $conn->close();
       editingStallId = null;
       document.getElementById("stallModalTitle").textContent = "Add Stall";
       document.getElementById("fieldStallName").value = "";
-      document.querySelector(
-        "input[name='stallStatus'][value='open']",
-      ).checked = true;
       document.getElementById("stallFormError").classList.add("hidden");
       document.getElementById("stallFormError").classList.remove("flex");
       document.getElementById("stallModal").classList.remove("hidden");
@@ -1228,9 +1195,6 @@ $conn->close();
       editingStallId = id;
       document.getElementById("stallModalTitle").textContent = "Edit Stall";
       document.getElementById("fieldStallName").value = s.name;
-      document.querySelector(
-        `input[name='stallStatus'][value='${s.status}']`,
-      ).checked = true;
       document.getElementById("stallFormError").classList.add("hidden");
       document.getElementById("stallFormError").classList.remove("flex");
       document.getElementById("stallModal").classList.remove("hidden");
@@ -1260,9 +1224,6 @@ $conn->close();
 
     async function saveStall() {
       const name = document.getElementById("fieldStallName").value.trim();
-      const status = document.querySelector(
-        "input[name='stallStatus']:checked",
-      ).value;
       const errEl = document.getElementById("stallFormError");
       const errMsg = document.getElementById("stallFormErrorMsg");
 
@@ -1281,12 +1242,10 @@ $conn->close();
       const res = editingStallId ?
         await postAction("edit_stall", {
           stall_id: editingStallId,
-          name,
-          status
+          name
         }) :
         await postAction("add_stall", {
-          name,
-          status
+          name
         });
 
       saveBtn.disabled = false;

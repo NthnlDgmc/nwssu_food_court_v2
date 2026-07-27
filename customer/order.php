@@ -9,6 +9,18 @@ if (!isset($_SESSION['customer_id'])) {
 
 $customerId = $_SESSION['customer_id'];
 
+$statusCheckStmt = $conn->prepare("SELECT status FROM customers WHERE customer_id = ? LIMIT 1");
+$statusCheckStmt->bind_param("i", $customerId);
+$statusCheckStmt->execute();
+$statusCheckRow = $statusCheckStmt->get_result()->fetch_assoc();
+$statusCheckStmt->close();
+
+if (!$statusCheckRow || $statusCheckRow['status'] === 'inactive') {
+  session_destroy();
+  header('Location: ../auth/login.php?deactivated=1');
+  exit;
+}
+
 require_once '../vendor/autoload.php';
 require_once '../config/vapid.php';
 

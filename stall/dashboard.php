@@ -38,6 +38,12 @@ function getOwnerInitials($first, $last)
 
 $ownerInitials = getOwnerInitials($ownerFirstName, $ownerLastName);
 
+$stallStmt = $conn->prepare("SELECT stall_id, status FROM stalls WHERE owner_id = ? LIMIT 1");
+$stallStmt->bind_param("i", $ownerId);
+$stallStmt->execute();
+$myStall = $stallStmt->get_result()->fetch_assoc();
+$stallStmt->close();
+
 function refValues($arr)
 {
   $refs = [];
@@ -311,6 +317,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
   header('Content-Type: application/json');
   $action = $_POST['action'];
 
+  if ($action === 'toggle_stall_status') {
+    $checkStmt = $conn->prepare("SELECT stall_id FROM stalls WHERE owner_id = ? LIMIT 1");
+    $checkStmt->bind_param("i", $ownerId);
+    $checkStmt->execute();
+    $stallRow = $checkStmt->get_result()->fetch_assoc();
+    $checkStmt->close();
+
+    if (!$stallRow) {
+      echo json_encode(['success' => false, 'message' => 'You do not have an assigned stall yet.']);
+      $conn->close();
+      exit;
+    }
+
+    $newStatus = ($_POST['status'] ?? '') === 'closed' ? 'closed' : 'open';
+
+    $stmt = $conn->prepare("UPDATE stalls SET status = ? WHERE owner_id = ?");
+    $stmt->bind_param("si", $newStatus, $ownerId);
+    $ok = $stmt->execute();
+    $stmt->close();
+
+    echo json_encode($ok
+      ? ['success' => true, 'status' => $newStatus]
+      : ['success' => false, 'message' => 'Failed to update stall status.']);
+    $conn->close();
+    exit;
+  }
+
   if ($action === 'mark_notification_read') {
     $notifId = (int) ($_POST['notification_id'] ?? 0);
 
@@ -485,6 +518,29 @@ $conn->close();
 
     <div class="flex-1 overflow-y-auto mt-12 mb-16" id="mainContent">
       <div class="max-w-5xl mx-auto px-4 pt-3 pb-4 flex flex-col gap-4" id="dashboardContent">
+        <?php if ($myStall): ?>
+          <div class="bg-white border border-gray-200 shadow-sm rounded-md p-3 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <span id="stallStatusDot" class="w-2.5 h-2.5 rounded-full <?php echo $myStall['status'] === 'open' ? 'bg-emerald-500' : 'bg-gray-300'; ?> shrink-0"></span>
+              <div class="min-w-0">
+                <p class="text-xs font-semibold text-gray-800">Stall Status</p>
+                <p id="stallStatusLabel" class="text-[10px] text-gray-400 truncate">
+                  <?php echo $myStall['status'] === 'open' ? 'Open — visible to customers' : 'Closed — hidden from customers'; ?>
+                </p>
+              </div>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                id="stallStatusToggle"
+                class="sr-only peer"
+                <?php echo $myStall['status'] === 'open' ? 'checked' : ''; ?> />
+              <div class="w-11 h-6 bg-gray-300 peer-checked:bg-emerald-500 rounded-full transition-colors"></div>
+              <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5 shadow"></div>
+            </label>
+          </div>
+        <?php endif; ?>
+
         <div id="pushPromptBanner" class="hidden bg-emerald-50 border border-emerald-200 p-3 rounded-md">
           <div class="flex items-center gap-2.5">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-emerald-600 shrink-0">
@@ -552,7 +608,7 @@ $conn->close();
               <span class="text-[10px] font-semibold text-gray-600 text-center">Analytics</span>
             </a>
             <a
-              href="./delivery_fee.php"
+              href="./delivery-fee.php"
               class="flex flex-col items-center justify-center gap-1 py-2 border border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/40 transition-all rounded-[6px]">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-emerald-600">
                 <path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
@@ -876,6 +932,40 @@ $conn->close();
         return await response.json();
       } catch (err) {
         return { success: false, message: "Something went wrong. Please try again." };
+      }
+    }
+
+    async function toggleStallStatus() {
+      const toggle = document.getElementById("stallStatusToggle");
+      const dot = document.getElementById("stallStatusDot");
+      const label = document.getElementById("stallStatusLabel");
+      const newStatus = toggle.checked ? "open" : "closed";
+
+      toggle.disabled = true;
+      const res = await postAction("toggle_stall_status", { status: newStatus });
+      toggle.disabled = false;
+
+      if (!res.success) {
+        toggle.checked = !toggle.checked;
+        alert(res.message || "Something went wrong. Please try again.");
+        return;
+      }
+
+      if (res.status === "open") {
+        dot.classList.remove("bg-gray-300");
+        dot.classList.add("bg-emerald-500");
+        label.textContent = "Open — visible to customers";
+      } else {
+        dot.classList.remove("bg-emerald-500");
+        dot.classList.add("bg-gray-300");
+        label.textContent = "Closed — hidden from customers";
+      }
+    }
+
+    function setupStallStatusToggle() {
+      const toggle = document.getElementById("stallStatusToggle");
+      if (toggle) {
+        toggle.addEventListener("change", toggleStallStatus);
       }
     }
 
@@ -1241,7 +1331,7 @@ $conn->close();
       }
     }
 
-    function setupPushPromptBanner() {
+    async function setupPushPromptBanner() {
       if ("serviceWorker" in navigator) {
         navigator.serviceWorker.register("../service-worker.js");
       }
@@ -1251,6 +1341,22 @@ $conn->close();
       }
 
       if (Notification.permission === "granted") {
+        const registration = await navigator.serviceWorker.getRegistration();
+        const existingSubscription = registration && (await registration.pushManager.getSubscription());
+
+        if (existingSubscription) {
+          await fetch("../save-push-subscription.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(existingSubscription),
+          });
+          return;
+        }
+
+        if (localStorage.getItem("notificationsOptedOut") === "1") {
+          return;
+        }
+
         subscribeToPush();
         return;
       }
@@ -1270,6 +1376,7 @@ $conn->close();
         const granted = await Notification.requestPermission();
         banner.classList.add("hidden");
         if (granted === "granted") {
+          localStorage.removeItem("notificationsOptedOut");
           await subscribeToPush();
         }
       });
@@ -1289,6 +1396,7 @@ $conn->close();
       setupNotifications();
       setupMessageButton();
       setupPushPromptBanner();
+      setupStallStatusToggle();
     }
 
     window.addEventListener("load", init);
