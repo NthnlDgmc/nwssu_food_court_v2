@@ -2,6 +2,7 @@
 session_start();
 require_once '../config/database.php';
 require_once '../config/vapid.php';
+require_once '../config/version.php';
 
 if (!isset($_SESSION['customer_id'])) {
   header('Location: ../auth/login.php');
@@ -232,6 +233,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     exit;
   }
 
+  if ($action === 'delete_account') {
+    $password = $_POST['password'] ?? '';
+
+    if ($password === '') {
+      echo json_encode(['success' => false, 'message' => 'Please enter your password.']);
+      $conn->close();
+      exit;
+    }
+
+    $stmt = $conn->prepare("SELECT password FROM customers WHERE customer_id = ? LIMIT 1");
+    $stmt->bind_param("i", $customerId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$row || !password_verify($password, $row['password'])) {
+      echo json_encode(['success' => false, 'message' => 'Incorrect password.']);
+      $conn->close();
+      exit;
+    }
+
+    $deleteStmt = $conn->prepare("DELETE FROM customers WHERE customer_id = ?");
+    $deleteStmt->bind_param("i", $customerId);
+    $ok = $deleteStmt->execute();
+    $deleteStmt->close();
+
+    if ($ok) {
+      session_destroy();
+    }
+
+    echo json_encode($ok
+      ? ['success' => true]
+      : ['success' => false, 'message' => 'Failed to delete account.']);
+    $conn->close();
+    exit;
+  }
+
   echo json_encode(['success' => false, 'message' => 'Unknown action.']);
   $conn->close();
   exit;
@@ -433,8 +471,8 @@ if (!$initialProfile) {
           </div>
           <div class="divide-y divide-gray-100">
             <button
-              class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
-              data-info="For assistance, please message the NWSSU Food Court support team via the Chats tab.">
+              id="helpCenterBtn"
+              class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">
               <span class="w-8 h-8 bg-gray-100 flex items-center justify-center shrink-0 rounded-[3px]">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
@@ -446,8 +484,8 @@ if (!$initialProfile) {
               </svg>
             </button>
             <button
-              class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
-              data-info="Terms of Service and Privacy Policy are coming soon.">
+              id="termsPrivacyBtn"
+              class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">
               <span class="w-8 h-8 bg-gray-100 flex items-center justify-center shrink-0 rounded-[3px]">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
@@ -465,7 +503,7 @@ if (!$initialProfile) {
                 </svg>
               </span>
               <span class="flex-1 text-xs font-medium text-gray-700">App Version</span>
-              <span class="text-xs text-gray-400">1.0.0</span>
+              <span class="text-xs text-gray-400"><?php echo APP_VERSION; ?></span>
             </div>
           </div>
         </div>
@@ -486,6 +524,12 @@ if (!$initialProfile) {
               d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75" />
           </svg>
           Log Out
+        </button>
+
+        <button
+          id="deleteAccountBtn"
+          class="w-full py-2 text-[11px] text-gray-400 hover:text-red-500 transition-colors text-center">
+          Delete My Account
         </button>
       </div>
     </div>
@@ -831,6 +875,116 @@ if (!$initialProfile) {
   </div>
 
   <div
+    id="termsPrivacyModal"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center px-4">
+    <div class="modal-overlay absolute inset-0" id="closeTermsPrivacyOverlay"></div>
+    <div
+      class="bg-white w-full max-w-lg max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl rounded-md">
+      <div class="p-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
+        <h2 class="font-bold text-gray-800 text-sm">Terms of Service &amp; Privacy Policy</h2>
+        <button id="closeTermsPrivacyBtn" class="p-1 hover:bg-gray-100 rounded-[3px]">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div class="p-4 space-y-4 text-[11px] text-gray-600 leading-relaxed">
+        <p class="text-[10px] text-gray-400">Last updated: <?php echo date('F Y'); ?></p>
+
+        <div>
+          <p class="text-xs font-bold text-gray-800 mb-1.5">Terms of Service</p>
+          <div class="space-y-2">
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">1. Who Can Use This App</p>
+              <p>This ordering system is for the NWSSU community and campus visitors. Campus users (students, faculty, and staff) sign up using their official ID number. Guests may sign up using a valid email address.</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">2. Your Account</p>
+              <p>You are responsible for keeping your password secure and for all activity under your account. Please make sure your contact number and email are accurate, as stalls and delivery staff use them to reach you about your order.</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">3. Orders and Payment</p>
+              <p>Orders can be paid via cash, GCash, or PayMaya. We may also enable online payments through PayMongo in test mode as we continue developing this system; no real charges will be processed while it remains in test mode. Menu prices and stall availability may change without prior notice.</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">4. Cancellations</p>
+              <p>Orders already being prepared or out for delivery may no longer be cancelled. Repeated unjustified cancellations or no-shows may result in account restrictions.</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">5. Acceptable Use</p>
+              <p>Please do not use this app to harass stall owners, delivery staff, or other customers, or to submit false orders or payment information.</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">6. Changes to These Terms</p>
+              <p>These terms may be updated as the system develops. Continued use of the app after changes means you accept the updated terms.</p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <p class="text-xs font-bold text-gray-800 mb-1.5">Privacy Policy</p>
+          <div class="space-y-2">
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">1. Information We Collect</p>
+              <p>We collect your name, contact number, email, and (for campus users) ID number, along with your order history and delivery location, so we can process and deliver your orders.</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">2. How We Use Your Information</p>
+              <p>Your information is used to create and manage your account, process orders, communicate order updates, and send optional push notifications you choose to enable.</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">3. Who Can See Your Information</p>
+              <p>Stall owners and delivery staff can only see the order and contact details needed to fulfill your specific order. Admins can access account information to manage the platform. We do not sell or share your information with outside companies.</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">4. Payment Information</p>
+              <p>If online payment via PayMongo is enabled, it currently runs in test mode only, meaning no real money or real card/GCash details are processed through it. Once live, payment details are handled directly by PayMongo and are not stored on our servers.</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">5. Data Security</p>
+              <p>Passwords are encrypted (hashed) and cannot be viewed by anyone, including admins. Access to the system requires a valid login session.</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">6. Your Choices</p>
+              <p>You can update your profile information anytime in Account Settings, and turn push notifications on or off from the Notifications setting. You may also permanently delete your account at any time using the Delete My Account option; this removes your profile and order history from our system and cannot be undone.</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">7. Questions</p>
+              <p>For concerns about your data, please contact the NWSSU Food Court administrator.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    id="helpCenterModal"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center px-4">
+    <div class="modal-overlay absolute inset-0" id="closeHelpCenterOverlay"></div>
+    <div
+      class="bg-white w-full max-w-md relative z-10 shadow-2xl p-5 space-y-4 text-center rounded-md">
+      <div class="w-12 h-12 bg-emerald-50 flex items-center justify-center mx-auto rounded-full">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-emerald-600">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+        </svg>
+      </div>
+      <div>
+        <p class="text-sm font-bold text-gray-800">Need Help?</p>
+        <p class="text-xs text-gray-500 mt-1">For assistance with your orders, account, or anything else, please message the NWSSU Food Court support team via the Chats tab.</p>
+      </div>
+      <div class="flex gap-2 pt-1">
+        <button id="closeHelpCenterBtn" class="flex-1 py-2.5 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors rounded-[3px]">
+          Close
+        </button>
+        <a href="./chat.php" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors rounded-[3px] flex items-center justify-center">
+          Go to Chats
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div
     id="logoutModal"
     class="fixed inset-0 z-[60] hidden flex items-center justify-center px-4">
     <div class="modal-overlay absolute inset-0" id="closeLogoutOverlay"></div>
@@ -851,6 +1005,76 @@ if (!$initialProfile) {
         </button>
         <button id="confirmLogoutBtn" class="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold transition-colors rounded-[3px]">
           Log Out
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div
+    id="deleteAccountModal"
+    class="fixed inset-0 z-[60] hidden flex items-center justify-center px-4">
+    <div class="modal-overlay absolute inset-0" id="closeDeleteAccountOverlay"></div>
+    <div
+      class="bg-white w-full max-w-md relative z-10 shadow-2xl p-5 space-y-4 rounded-md">
+      <div class="w-12 h-12 bg-red-50 flex items-center justify-center mx-auto rounded-full">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-red-500">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+        </svg>
+      </div>
+      <div class="text-center">
+        <p class="text-sm font-bold text-gray-800">Delete Your Account</p>
+        <p class="text-xs text-gray-500 mt-1">This will permanently delete your account and all your order history. This cannot be undone.</p>
+      </div>
+
+      <div
+        id="deleteAccountError"
+        class="hidden flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-[3px]">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-red-500 shrink-0">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+        </svg>
+        <p class="text-[10px] text-red-600 font-medium leading-none" id="deleteAccountErrorMsg"></p>
+      </div>
+
+      <div>
+        <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Enter your password to confirm</label>
+        <div class="relative">
+          <div class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+            </svg>
+          </div>
+          <input type="password" id="deleteAccountPassword" placeholder="Your current password" class="w-full pl-9 pr-9 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-red-500 rounded-[3px]" />
+          <button
+            type="button"
+            id="toggleDeleteAccountPasswordBtn"
+            class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke-width="1.5"
+              stroke="currentColor"
+              class="w-4 h-4"
+              id="deleteAccountPwEyeIcon">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="flex gap-2 pt-1">
+        <button id="cancelDeleteAccountBtn" class="flex-1 py-2.5 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors rounded-[3px]">
+          Cancel
+        </button>
+        <button id="confirmDeleteAccountBtn" class="flex-1 py-2.5 bg-red-500 hover:bg-red-600 disabled:opacity-70 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors rounded-[3px]">
+          Delete Account
         </button>
       </div>
     </div>
@@ -1137,6 +1361,55 @@ if (!$initialProfile) {
     function closeLogoutModal() {
       document.getElementById("logoutModal").classList.add("hidden");
       document.body.style.overflow = "";
+    }
+
+    function openDeleteAccountModal() {
+      const pwInput = document.getElementById("deleteAccountPassword");
+      pwInput.value = "";
+      pwInput.type = "password";
+      document.getElementById("deleteAccountPwEyeIcon").innerHTML =
+        `<path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>`;
+      document.getElementById("deleteAccountError").classList.add("hidden");
+      document.getElementById("deleteAccountError").classList.remove("flex");
+      document.getElementById("deleteAccountModal").classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeDeleteAccountModal() {
+      document.getElementById("deleteAccountModal").classList.add("hidden");
+      document.body.style.overflow = "";
+    }
+
+    async function confirmDeleteAccount() {
+      const password = document.getElementById("deleteAccountPassword").value;
+      const errEl = document.getElementById("deleteAccountError");
+      const errMsg = document.getElementById("deleteAccountErrorMsg");
+
+      errEl.classList.add("hidden");
+      errEl.classList.remove("flex");
+
+      if (!password) {
+        errMsg.textContent = "Please enter your password.";
+        errEl.classList.remove("hidden");
+        errEl.classList.add("flex");
+        return;
+      }
+
+      const btn = document.getElementById("confirmDeleteAccountBtn");
+      btn.disabled = true;
+
+      const res = await postAction("delete_account", { password });
+
+      btn.disabled = false;
+
+      if (!res.success) {
+        errMsg.textContent = res.message || "Something went wrong. Please try again.";
+        errEl.classList.remove("hidden");
+        errEl.classList.add("flex");
+        return;
+      }
+
+      window.location.href = "../auth/login.php?deleted=1";
     }
 
     function updateEditProfilePreview(src, initials) {
@@ -1554,10 +1827,34 @@ if (!$initialProfile) {
       document.getElementById("statMemberSince").textContent = customerAccount.memberSince;
     }
 
-    function setupInfoRows() {
-      document.querySelectorAll(".account-row[data-info]").forEach((row) => {
-        row.addEventListener("click", () => alert(row.getAttribute("data-info")));
-      });
+    function setupTermsPrivacyModal() {
+      const modal = document.getElementById("termsPrivacyModal");
+      const openModal = () => {
+        modal.classList.remove("hidden");
+        document.body.style.overflow = "hidden";
+      };
+      const closeModal = () => {
+        modal.classList.add("hidden");
+        document.body.style.overflow = "";
+      };
+      document.getElementById("termsPrivacyBtn").addEventListener("click", openModal);
+      document.getElementById("closeTermsPrivacyBtn").addEventListener("click", closeModal);
+      document.getElementById("closeTermsPrivacyOverlay").addEventListener("click", closeModal);
+    }
+
+    function setupHelpCenterModal() {
+      const modal = document.getElementById("helpCenterModal");
+      const openModal = () => {
+        modal.classList.remove("hidden");
+        document.body.style.overflow = "hidden";
+      };
+      const closeModal = () => {
+        modal.classList.add("hidden");
+        document.body.style.overflow = "";
+      };
+      document.getElementById("helpCenterBtn").addEventListener("click", openModal);
+      document.getElementById("closeHelpCenterBtn").addEventListener("click", closeModal);
+      document.getElementById("closeHelpCenterOverlay").addEventListener("click", closeModal);
     }
 
     function setupLogoutModal() {
@@ -1569,13 +1866,23 @@ if (!$initialProfile) {
       });
     }
 
+    function setupDeleteAccountModal() {
+      document.getElementById("deleteAccountBtn").addEventListener("click", openDeleteAccountModal);
+      document.getElementById("closeDeleteAccountOverlay").addEventListener("click", closeDeleteAccountModal);
+      document.getElementById("cancelDeleteAccountBtn").addEventListener("click", closeDeleteAccountModal);
+      document.getElementById("confirmDeleteAccountBtn").addEventListener("click", confirmDeleteAccount);
+      makePasswordToggle("toggleDeleteAccountPasswordBtn", "deleteAccountPassword", "deleteAccountPwEyeIcon");
+    }
+
     function init() {
       renderProfile();
       setupBackButton();
       setupEditProfileModal();
       setupChangePasswordModal();
-      setupInfoRows();
+      setupHelpCenterModal();
+      setupTermsPrivacyModal();
       setupLogoutModal();
+      setupDeleteAccountModal();
       setupNotificationToggle();
     }
 

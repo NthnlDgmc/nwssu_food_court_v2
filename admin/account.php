@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../config/database.php';
+require_once '../config/version.php';
 
 if (!isset($_SESSION['admin_id'])) {
     header('Location: ../auth/login.php');
@@ -608,7 +609,7 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
                   </svg>
                 </span>
                 <span class="flex-1 text-xs font-medium text-gray-700">App Version</span>
-                <span class="text-xs text-gray-400">1.0.0</span>
+                <span class="text-xs text-gray-400"><?php echo APP_VERSION; ?></span>
               </div>
             </div>
           </div>

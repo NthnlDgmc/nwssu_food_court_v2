@@ -2,6 +2,7 @@
 session_start();
 require_once '../config/database.php';
 require_once '../config/vapid.php';
+require_once '../config/version.php';
 
 if (!isset($_SESSION['owner_id'])) {
   header('Location: ../auth/login.php');
@@ -491,8 +492,8 @@ if (!$initialProfile) {
               </svg>
             </button>
             <button
-              class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
-              data-info="Terms of Service and Privacy Policy are coming soon.">
+              id="termsPrivacyBtn"
+              class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">
               <span class="w-8 h-8 bg-gray-100 flex items-center justify-center shrink-0 rounded-[3px]">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
@@ -510,7 +511,7 @@ if (!$initialProfile) {
                 </svg>
               </span>
               <span class="flex-1 text-xs font-medium text-gray-700">App Version</span>
-              <span class="text-xs text-gray-400">1.0.0</span>
+              <span class="text-xs text-gray-400"><?php echo APP_VERSION; ?></span>
             </div>
           </div>
         </div>
@@ -909,6 +910,90 @@ if (!$initialProfile) {
             <div class="w-11 h-6 bg-gray-300 peer-checked:bg-emerald-500 rounded-full transition-colors"></div>
             <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5 shadow"></div>
           </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    id="termsPrivacyModal"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center px-4">
+    <div class="modal-overlay absolute inset-0" id="closeTermsPrivacyOverlay"></div>
+    <div
+      class="bg-white w-full max-w-lg max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl rounded-md">
+      <div class="p-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
+        <h2 class="font-bold text-gray-800 text-sm">Terms of Service &amp; Privacy Policy</h2>
+        <button id="closeTermsPrivacyBtn" class="p-1 hover:bg-gray-100 rounded-[3px]">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div class="p-4 space-y-4 text-[11px] text-gray-600 leading-relaxed">
+        <p class="text-[10px] text-gray-400">Last updated: <?php echo date('F Y'); ?></p>
+
+        <div>
+          <p class="text-xs font-bold text-gray-800 mb-1.5">Terms of Service</p>
+          <div class="space-y-2">
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">1. Your Account</p>
+              <p>Stall owner accounts are created and assigned by the NWSSU Food Court admin. You are responsible for keeping your password secure and your contact information up to date, since customers and delivery staff rely on it to reach you.</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">2. Managing Your Stall</p>
+              <p>You are responsible for the accuracy of your menu items, prices, availability status, business hours, and delivery fee. Please keep these updated so customers see correct information.</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">3. Order Fulfillment</p>
+              <p>Orders placed to your stall should be accepted, prepared, and handed off (for pickup or delivery) promptly. Repeated unfulfilled or ignored orders may be reviewed by the admin.</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">4. Payment</p>
+              <p>Customers may pay via cash, GCash, or PayMaya. We may also enable online payments through PayMongo in test mode as we continue developing this system; no real charges will be processed while it remains in test mode.</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">5. Acceptable Use</p>
+              <p>Please do not use this app to submit false order updates, misrepresent your menu, or harass customers or delivery staff.</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">6. Changes to These Terms</p>
+              <p>These terms may be updated as the system develops. Continued use of the app after changes means you accept the updated terms.</p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <p class="text-xs font-bold text-gray-800 mb-1.5">Privacy Policy</p>
+          <div class="space-y-2">
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">1. Information We Collect</p>
+              <p>We collect your name, contact number, email, business hours, and delivery fee, along with the orders placed to your stall, so the platform can operate and route orders to you correctly.</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">2. How We Use Your Information</p>
+              <p>Your information is used to manage your stall account, display your stall to customers, process incoming orders, and send optional push notifications you choose to enable.</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">3. Who Can See Your Information</p>
+              <p>Customers can see your stall name and contact details for orders they place with you. Delivery staff can see order details needed for handoff. Admins can access your account information to manage the platform. We do not sell or share your information with outside companies.</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">4. Payment Information</p>
+              <p>If online payment via PayMongo is enabled, it currently runs in test mode only, meaning no real money or real card/GCash details are processed through it. Once live, payment details are handled directly by PayMongo and are not stored on our servers.</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">5. Data Security</p>
+              <p>Passwords are encrypted (hashed) and cannot be viewed by anyone, including admins. Access to the system requires a valid login session.</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">6. Your Choices</p>
+              <p>You can update your profile, delivery fee, and business hours anytime in Account Settings, and you can turn push notifications on or off from the Notifications setting.</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-gray-700">7. Questions</p>
+              <p>For concerns about your data, please contact the NWSSU Food Court administrator.</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1742,6 +1827,21 @@ if (!$initialProfile) {
       });
     }
 
+    function setupTermsPrivacyModal() {
+      const modal = document.getElementById("termsPrivacyModal");
+      const openModal = () => {
+        modal.classList.remove("hidden");
+        document.body.style.overflow = "hidden";
+      };
+      const closeModal = () => {
+        modal.classList.add("hidden");
+        document.body.style.overflow = "";
+      };
+      document.getElementById("termsPrivacyBtn").addEventListener("click", openModal);
+      document.getElementById("closeTermsPrivacyBtn").addEventListener("click", closeModal);
+      document.getElementById("closeTermsPrivacyOverlay").addEventListener("click", closeModal);
+    }
+
     function setupLogoutModal() {
       document.getElementById("logoutBtn").addEventListener("click", openLogoutModal);
       document.getElementById("closeLogoutOverlay").addEventListener("click", closeLogoutModal);
@@ -1758,6 +1858,7 @@ if (!$initialProfile) {
       setupChangePasswordModal();
       setupBusinessHoursModal();
       setupInfoRows();
+      setupTermsPrivacyModal();
       setupLogoutModal();
       setupNotificationToggle();
     }

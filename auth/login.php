@@ -18,6 +18,7 @@ if ($existingLockoutUntil > time()) {
 }
 
 $showDeactivatedMessage = isset($_GET['deactivated']);
+$showDeletedMessage = isset($_GET['deleted']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
@@ -650,6 +651,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       const showDeactivatedMessage = <?php echo $showDeactivatedMessage ? 'true' : 'false'; ?>;
       if (showDeactivatedMessage) {
         showError("Your account has been deactivated. Please contact support.");
+      }
+
+      const showDeletedMessage = <?php echo $showDeletedMessage ? 'true' : 'false'; ?>;
+      if (showDeletedMessage) {
+        showError("Your account has been deleted. Thank you for using NWSSU Food Court.");
       }
 
       if ("serviceWorker" in navigator) {
