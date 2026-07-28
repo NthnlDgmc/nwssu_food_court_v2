@@ -161,11 +161,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
 
-    if (!$row || $currentPw !== $row['password']) {
+    if (!$row || !password_verify($currentPw, $row['password'])) {
       echo json_encode(['success' => false, 'message' => 'Current password is incorrect.']);
       $conn->close();
       exit;
     }
+
+    $newPw = password_hash($newPw, PASSWORD_DEFAULT);
 
     $updateStmt = $conn->prepare("UPDATE delivery_staff SET password = ? WHERE staff_id = ?");
     $updateStmt->bind_param("si", $newPw, $staffId);

@@ -250,6 +250,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
 
+    $password = password_hash($password, PASSWORD_DEFAULT);
+
     if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
       echo json_encode(['success' => false, 'message' => 'Please enter a valid email address.']);
       $conn->close();
@@ -400,7 +402,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     $passwordToSave = $existing['password'];
     if ($password !== '') {
-      $passwordToSave = $password;
+      $passwordToSave = password_hash($password, PASSWORD_DEFAULT);
     }
 
     $emailToSave = $email !== '' ? $email : null;

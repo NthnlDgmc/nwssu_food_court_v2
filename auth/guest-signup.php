@@ -176,6 +176,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
 
+    $password = password_hash($password, PASSWORD_DEFAULT);
+
     if (isEmailRegisteredAnywhere($conn, $email)) {
       echo json_encode(['success' => false, 'message' => 'This email address is already registered.']);
       $conn->close();

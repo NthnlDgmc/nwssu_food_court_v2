@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($row = $result->fetch_assoc()) {
         $stmt->close();
-        if ($password === $row['password']) {
+        if (password_verify($password, $row['password'])) {
             session_regenerate_id(true);
             $_SESSION = [];
 
@@ -82,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($row = $result->fetch_assoc()) {
         $stmt->close();
-        if ($password === $row['password']) {
+        if (password_verify($password, $row['password'])) {
             session_regenerate_id(true);
             $_SESSION = [];
 
@@ -106,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($row = $result->fetch_assoc()) {
         $stmt->close();
-        if ($password === $row['password']) {
+        if (password_verify($password, $row['password'])) {
             session_regenerate_id(true);
             $_SESSION = [];
 
@@ -130,7 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($row = $result->fetch_assoc()) {
         $stmt->close();
-        if ($password === $row['password']) {
+        if (password_verify($password, $row['password'])) {
             if ($row['status'] === 'inactive') {
                 echo json_encode(['success' => false, 'message' => 'Your account has been deactivated. Please contact the admin for assistance.']);
                 exit;

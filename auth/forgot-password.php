@@ -233,6 +233,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
 
+    $newPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+
     $stmt = $conn->prepare("SELECT reset_id, user_type, expires_at FROM password_resets WHERE email = ? AND code = ? AND used = 0 LIMIT 1");
     $stmt->bind_param("ss", $email, $code);
     $stmt->execute();

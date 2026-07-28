@@ -230,6 +230,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
 
+    $password = password_hash($password, PASSWORD_DEFAULT);
+
     $profileImagePath = null;
     if (strpos($imageData, 'data:image') === 0) {
       $profileImagePath = saveStaffProfileImage($imageData);
@@ -348,7 +350,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     $passwordToSave = $existing['password'];
     if ($password !== '') {
-      $passwordToSave = $password;
+      $passwordToSave = password_hash($password, PASSWORD_DEFAULT);
     }
 
     $stmt = $conn->prepare("UPDATE delivery_staff SET profile_image = ?, first_name = ?, last_name = ?, contact_number = ?, email = ?, password = ?, status = ? WHERE staff_id = ?");
