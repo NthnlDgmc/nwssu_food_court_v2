@@ -163,6 +163,7 @@ CREATE TABLE orders (
         'cancelled'
     ) DEFAULT 'pending',
     payment_method ENUM('cash', 'gcash', 'paymaya') NOT NULL DEFAULT 'cash',
+    payment_status ENUM('unpaid', 'paid') NOT NULL DEFAULT 'unpaid',
     total_amount DECIMAL(10, 2) NOT NULL,
     total_delivery_fee DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     grand_total DECIMAL(10, 2) NOT NULL,
@@ -217,4 +218,21 @@ CREATE TABLE push_subscriptions (
     auth_key VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_user (user_type, user_id)
+);
+
+
+CREATE TABLE payment_transactions (
+    transaction_id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id INT NOT NULL,
+    order_ids VARCHAR(255) NULL,
+    checkout_data MEDIUMTEXT NOT NULL,
+    paymongo_source_id VARCHAR(100) NULL,
+    paymongo_payment_id VARCHAR(100) NULL,
+    payment_method ENUM('gcash', 'paymaya') NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    status ENUM('pending', 'paid', 'failed') NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_source (paymongo_source_id),
+    FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE CASCADE
 );

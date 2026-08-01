@@ -42,7 +42,7 @@ $menuItemsResult = $conn->query("
     FROM menu_items mi
     JOIN stalls s ON mi.stall_id = s.stall_id
     JOIN categories c ON mi.category_id = c.category_id
-    WHERE mi.status = 'available' AND s.status = 'open' AND mi.owner_id = s.owner_id
+    WHERE mi.status = 'available' AND s.status = 'open' AND c.status = 'active' AND mi.owner_id = s.owner_id
     ORDER BY mi.created_at DESC
 ");
 $menuItems = [];
@@ -69,7 +69,7 @@ $conn->close();
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NWSSU Food Court - Browse Menu</title>
   <link rel="icon" href="assets/images/nwssu-logo.png" type="image/png" />
-  <link rel="manifest" href="/nwssu_food_court/manifest.json" />
+  <link rel="manifest" href="manifest.json" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
@@ -159,8 +159,8 @@ $conn->close();
 <body class="bg-white">
   <div class="flex flex-col h-screen">
 
-    <div class="bg-white flex-shrink-0 fixed top-0 left-0 right-0 z-20 border-b border-gray-100">
-      <div class="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
+    <div class="bg-white flex-shrink-0 fixed top-0 left-0 right-0 z-20">
+      <div class="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
         <div class="flex items-center gap-2.5 min-w-0">
           <img src="assets/images/nwssu-logo.png" alt="NWSSU Food Court" class="w-9 h-9 object-contain shrink-0" />
           <div class="min-w-0">
@@ -184,7 +184,7 @@ $conn->close();
     </div>
 
     <div class="flex-1 overflow-y-auto mt-12" id="mainContent">
-      <div class="max-w-6xl mx-auto px-4 pt-3 pb-6 space-y-3">
+      <div class="max-w-5xl mx-auto px-4 pt-3 pb-6 space-y-3">
 
         <div class="bg-white border border-gray-200 p-3 shadow-sm rounded-md">
           <div class="flex gap-2">

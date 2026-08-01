@@ -9,7 +9,7 @@ if (!isset($_SESSION['customer_id'])) {
 
 $customerId = $_SESSION['customer_id'];
 
-$statusCheckStmt = $conn->prepare("SELECT status FROM customers WHERE customer_id = ? LIMIT 1");
+$statusCheckStmt = $conn->prepare("SELECT status, customer_type FROM customers WHERE customer_id = ? LIMIT 1");
 $statusCheckStmt->bind_param("i", $customerId);
 $statusCheckStmt->execute();
 $statusCheckRow = $statusCheckStmt->get_result()->fetch_assoc();
@@ -21,8 +21,11 @@ if (!$statusCheckRow || $statusCheckRow['status'] === 'inactive') {
   exit;
 }
 
+$isGuestCustomer = $statusCheckRow['customer_type'] === 'guest';
+
 require_once '../vendor/autoload.php';
 require_once '../config/vapid.php';
+require_once '../config/paymongo.php';
 
 function createNotification($conn, $userType, $userId, $title, $message, $link = null)
 {
@@ -86,6 +89,148 @@ function refValues($arr)
     $refs[$key] = &$arr[$key];
   }
   return $refs;
+}
+
+function createPaymongoSource($amount, $type, $successUrl, $failedUrl, $billingName = '', $billingEmail = '')
+{
+  $amountInCentavos = (int) round($amount * 100);
+
+  $payload = [
+    'data' => [
+      'attributes' => [
+        'amount' => $amountInCentavos,
+        'redirect' => [
+          'success' => $successUrl,
+          'failed' => $failedUrl,
+        ],
+        'type' => $type,
+        'currency' => 'PHP',
+        'billing' => [
+          'name' => $billingName,
+          'email' => $billingEmail,
+        ],
+      ],
+    ],
+  ];
+
+  $ch = curl_init('https://api.paymongo.com/v1/sources');
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+  curl_setopt($ch, CURLOPT_POST, true);
+  curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+  curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    'Content-Type: application/json',
+    'Accept: application/json',
+    'Authorization: Basic ' . base64_encode(PAYMONGO_SECRET_KEY . ':'),
+  ]);
+  $response = curl_exec($ch);
+  $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+  $curlError = curl_error($ch);
+  curl_close($ch);
+
+  if ($curlError || $httpCode >= 400) {
+    error_log('PayMongo createSource failed. cURL error: ' . $curlError . ' | HTTP code: ' . $httpCode . ' | Response: ' . $response);
+    return ['error' => true, 'curlError' => $curlError, 'httpCode' => $httpCode, 'response' => $response];
+  }
+
+  $decoded = json_decode($response, true);
+  if (!isset($decoded['data']['id'])) {
+    error_log('PayMongo createSource unexpected response: ' . $response);
+    return ['error' => true, 'curlError' => '', 'httpCode' => $httpCode, 'response' => $response];
+  }
+
+  return [
+    'sourceId' => $decoded['data']['id'],
+    'checkoutUrl' => $decoded['data']['attributes']['redirect']['checkout_url'],
+  ];
+}
+
+function paymongoApiCall($url, $payload)
+{
+  $ch = curl_init($url);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+  curl_setopt($ch, CURLOPT_POST, true);
+  curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+  curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    'Content-Type: application/json',
+    'Accept: application/json',
+    'Authorization: Basic ' . base64_encode(PAYMONGO_SECRET_KEY . ':'),
+  ]);
+  $response = curl_exec($ch);
+  $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+  $curlError = curl_error($ch);
+  curl_close($ch);
+
+  if ($curlError || $httpCode >= 400) {
+    error_log('PayMongo API call failed (' . $url . '). cURL: ' . $curlError . ' | HTTP: ' . $httpCode . ' | Response: ' . $response);
+    return ['error' => true, 'curlError' => $curlError, 'httpCode' => $httpCode, 'response' => $response];
+  }
+
+  return json_decode($response, true);
+}
+
+function createMayaPaymentIntent($amount, $returnUrl, $billingName = '', $billingEmail = '')
+{
+  $amountInCentavos = (int) round($amount * 100);
+
+  $intentResult = paymongoApiCall('https://api.paymongo.com/v1/payment_intents', [
+    'data' => [
+      'attributes' => [
+        'amount' => $amountInCentavos,
+        'payment_method_allowed' => ['paymaya'],
+        'payment_method_options' => ['paymaya' => new stdClass()],
+        'currency' => 'PHP',
+        'capture_type' => 'automatic',
+      ],
+    ],
+  ]);
+
+  if (!empty($intentResult['error']) || !isset($intentResult['data']['id'])) {
+    return $intentResult['error'] ?? ['error' => true, 'curlError' => '', 'httpCode' => 0, 'response' => json_encode($intentResult)];
+  }
+
+  $paymentIntentId = $intentResult['data']['id'];
+
+  $methodResult = paymongoApiCall('https://api.paymongo.com/v1/payment_methods', [
+    'data' => [
+      'attributes' => [
+        'type' => 'paymaya',
+        'billing' => [
+          'name' => $billingName,
+          'email' => $billingEmail,
+        ],
+      ],
+    ],
+  ]);
+
+  if (!empty($methodResult['error']) || !isset($methodResult['data']['id'])) {
+    return $methodResult['error'] ?? ['error' => true, 'curlError' => '', 'httpCode' => 0, 'response' => json_encode($methodResult)];
+  }
+
+  $paymentMethodId = $methodResult['data']['id'];
+
+  $attachResult = paymongoApiCall('https://api.paymongo.com/v1/payment_intents/' . $paymentIntentId . '/attach', [
+    'data' => [
+      'attributes' => [
+        'payment_method' => $paymentMethodId,
+        'return_url' => $returnUrl,
+      ],
+    ],
+  ]);
+
+  if (!empty($attachResult['error'])) {
+    return $attachResult['error'];
+  }
+
+  $redirectUrl = $attachResult['data']['attributes']['next_action']['redirect']['url'] ?? null;
+
+  if (!$redirectUrl) {
+    return ['error' => true, 'curlError' => '', 'httpCode' => 0, 'response' => json_encode($attachResult)];
+  }
+
+  return [
+    'paymentIntentId' => $paymentIntentId,
+    'checkoutUrl' => $redirectUrl,
+  ];
 }
 
 function pruneStaleCartItems($conn, $customerId)
@@ -247,9 +392,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
   if ($action === 'place_order') {
     $orderType = ($_POST['order_type'] ?? 'delivery') === 'pickup' ? 'pickup' : 'delivery';
+    if ($isGuestCustomer && $orderType === 'delivery') {
+      echo json_encode(['success' => false, 'message' => 'Delivery is not available for guest accounts. Please choose Pickup.']);
+      $conn->close();
+      exit;
+    }
     $paymentMethod = $_POST['payment_method'] ?? 'cash';
     if (!in_array($paymentMethod, ['cash', 'gcash', 'paymaya'], true)) {
       $paymentMethod = 'cash';
+    }
+    if ($isGuestCustomer && $paymentMethod === 'cash') {
+      echo json_encode(['success' => false, 'message' => 'Cash on Delivery is not available for guest accounts. Please choose GCash or PayMaya.']);
+      $conn->close();
+      exit;
     }
     $location = trim($_POST['location'] ?? '');
 
@@ -261,12 +416,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     pruneStaleCartItems($conn, $customerId);
 
-    $customerNameStmt = $conn->prepare("SELECT first_name, last_name FROM customers WHERE customer_id = ? LIMIT 1");
+    $customerNameStmt = $conn->prepare("SELECT first_name, last_name, email FROM customers WHERE customer_id = ? LIMIT 1");
     $customerNameStmt->bind_param("i", $customerId);
     $customerNameStmt->execute();
     $customerNameRow = $customerNameStmt->get_result()->fetch_assoc();
     $customerNameStmt->close();
     $customerFullName = $customerNameRow ? trim($customerNameRow['first_name'] . ' ' . $customerNameRow['last_name']) : 'A customer';
+    $customerEmail = $customerNameRow ? ($customerNameRow['email'] ?: '') : '';
 
     $stmt = $conn->prepare("
             SELECT c.cart_id, c.menu_item_id, c.stall_id, c.quantity, c.note,
@@ -313,6 +469,98 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
 
+    if ($paymentMethod === 'gcash' || $paymentMethod === 'paymaya') {
+      if ($customerEmail === '') {
+        echo json_encode(['success' => false, 'message' => 'Please add an email address to your profile before using GCash or PayMaya.']);
+        $conn->close();
+        exit;
+      }
+
+      $overallGrandTotal = 0.00;
+      $checkoutGroups = [];
+
+      foreach ($groups as $stallId => $group) {
+        $totalAmount = 0.00;
+        foreach ($group['items'] as $item) {
+          $totalAmount += $item['price'] * $item['quantity'];
+        }
+        $deliveryFee = $orderType === 'delivery' ? $group['delivery_fee'] : 0.00;
+        $grandTotal = $totalAmount + $deliveryFee;
+        $overallGrandTotal += $grandTotal;
+
+        $checkoutGroups[] = [
+          'stall_id' => $stallId,
+          'owner_id' => $group['owner_id'],
+          'staff_id' => $orderType === 'delivery' ? $group['staff_id'] : null,
+          'note' => $group['note'],
+          'items' => $group['items'],
+          'cart_ids' => $group['cart_ids'],
+          'total_amount' => $totalAmount,
+          'delivery_fee' => $deliveryFee,
+          'grand_total' => $grandTotal,
+        ];
+      }
+
+      $checkoutData = json_encode([
+        'order_type' => $orderType,
+        'location' => $orderType === 'delivery' ? $location : null,
+        'payment_method' => $paymentMethod,
+        'customer_full_name' => $customerFullName,
+        'groups' => $checkoutGroups,
+      ]);
+
+      $txnStmt = $conn->prepare("INSERT INTO payment_transactions (customer_id, checkout_data, payment_method, amount, status) VALUES (?, ?, ?, ?, 'pending')");
+      $txnStmt->bind_param("issd", $customerId, $checkoutData, $paymentMethod, $overallGrandTotal);
+      $txnStmt->execute();
+      $transactionId = $txnStmt->insert_id;
+      $txnStmt->close();
+
+      $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+      $baseUrl = $protocol . '://' . $_SERVER['HTTP_HOST'] . dirname($_SERVER['SCRIPT_NAME']);
+      $successUrl = $baseUrl . '/payment-callback.php?txn=' . $transactionId . '&status=success';
+      $failedUrl = $baseUrl . '/payment-callback.php?txn=' . $transactionId . '&status=failed';
+
+      if ($paymentMethod === 'gcash') {
+        $result = createPaymongoSource($overallGrandTotal, $paymentMethod, $successUrl, $failedUrl, $customerFullName, $customerEmail);
+        $referenceId = $result['sourceId'] ?? null;
+      } else {
+        $result = createMayaPaymentIntent($overallGrandTotal, $successUrl, $customerFullName, $customerEmail);
+        $referenceId = $result['paymentIntentId'] ?? null;
+      }
+
+      if (!$result || !empty($result['error']) || !$referenceId) {
+        $failStmt = $conn->prepare("UPDATE payment_transactions SET status = 'failed' WHERE transaction_id = ?");
+        $failStmt->bind_param("i", $transactionId);
+        $failStmt->execute();
+        $failStmt->close();
+
+        $debugDetail = $result
+          ? ('cURL: ' . ($result['curlError'] ?? '') . ' | HTTP: ' . ($result['httpCode'] ?? '') . ' | Response: ' . ($result['response'] ?? ''))
+          : 'Unknown error';
+
+        echo json_encode([
+          'success' => false,
+          'message' => 'Failed to initialize online payment. Please try again or choose a different payment method.',
+          'debug' => $debugDetail,
+        ]);
+        $conn->close();
+        exit;
+      }
+
+      $updateSourceStmt = $conn->prepare("UPDATE payment_transactions SET paymongo_source_id = ? WHERE transaction_id = ?");
+      $updateSourceStmt->bind_param("si", $referenceId, $transactionId);
+      $updateSourceStmt->execute();
+      $updateSourceStmt->close();
+
+      echo json_encode([
+        'success' => true,
+        'requires_redirect' => true,
+        'checkout_url' => $result['checkoutUrl'],
+      ]);
+      $conn->close();
+      exit;
+    }
+
     $createdOrderIds = [];
     $allCartIds = [];
 
@@ -354,7 +602,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       $createdOrderIds[] = $newOrderId;
 
       if ($group['owner_id'] !== null) {
-        $friendlyOrderId = 'FC-' . str_pad($newOrderId, 6, '0', STR_PAD_LEFT);
+        $friendlyOrderId = 'ORD-' . date('Y') . '-' . str_pad($newOrderId, 6, '0', STR_PAD_LEFT);
         createNotification(
           $conn,
           'stall_owner',
@@ -398,7 +646,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     $friendlyIds = array_map(function ($id) {
-      return 'FC-' . str_pad($id, 6, '0', STR_PAD_LEFT);
+      return 'ORD-' . date('Y') . '-' . str_pad($id, 6, '0', STR_PAD_LEFT);
     }, $createdOrderIds);
 
     echo json_encode([
@@ -501,17 +749,6 @@ $conn->close();
 
     .item-image-fade.loaded {
       opacity: 1;
-    }
-
-    #toast {
-      opacity: 0;
-      transform: translate(-50%, 8px);
-      transition: opacity 0.25s ease, transform 0.25s ease;
-    }
-
-    #toast.toast-visible {
-      opacity: 1;
-      transform: translate(-50%, 0);
     }
 
   </style>
@@ -661,6 +898,17 @@ $conn->close();
                   class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
                   Order Type
                 </p>
+                <?php if ($isGuestCustomer): ?>
+                <div class="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-[3px]">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500 shrink-0">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016c.896 0 1.7-.393 2.25-1.015a3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19A1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72m-13.5 8.65h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .415.336.75.75.75Z" />
+                  </svg>
+                  <span class="text-[11px] font-semibold text-gray-700">Pickup Order</span>
+                </div>
+                <p class="text-[10px] text-gray-400 mt-1.5 leading-relaxed">
+                  Delivery is not available for guest accounts. Please head to the stall to pick up your order.
+                </p>
+                <?php else: ?>
                 <div class="flex bg-gray-100 p-0.5 gap-0.5 rounded-[3px]">
                   <button
                     id="orderTypeDelivery"
@@ -675,9 +923,10 @@ $conn->close();
                     Pickup
                   </button>
                 </div>
+                <?php endif; ?>
               </div>
 
-              <div id="locationSection">
+              <div id="locationSection" class="<?php echo $isGuestCustomer ? 'hidden' : ''; ?>">
                 <p
                   class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
                   Drop-off Location
@@ -730,19 +979,40 @@ $conn->close();
                 </button>
               </div>
 
-              <div id="pickupSection" class="hidden">
+              <div id="pickupSection" class="<?php echo $isGuestCustomer ? '' : 'hidden'; ?>">
+                <p
+                  class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  Pickup Location
+                </p>
                 <div
-                  class="border border-emerald-100 bg-emerald-50 p-3 rounded-[3px]">
-                  <div class="flex items-center gap-2 mb-1.5">
-                    <p class="text-xs font-semibold text-emerald-700">
+                  class="flex items-center gap-3 p-2.5 border border-gray-200 rounded-[3px]">
+                  <div
+                    class="w-9 h-9 bg-gray-100 flex items-center justify-center shrink-0 rounded-[3px]">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke-width="1.5"
+                      stroke="currentColor"
+                      class="w-4 h-4 text-gray-500">
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016c.896 0 1.7-.393 2.25-1.015a3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19A1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72m-13.5 8.65h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .415.336.75.75.75Z" />
+                    </svg>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-[10px] text-gray-400 mb-0.5">
                       Pickup order
                     </p>
+                    <p class="text-xs font-medium text-gray-700 truncate">
+                      Head to the stall when ready
+                    </p>
                   </div>
-                  <p class="text-[10px] text-emerald-600 leading-relaxed">
-                    Head to the stall when your order is ready. No delivery
-                    fee applies.
-                  </p>
                 </div>
+                <p class="text-[10px] text-gray-400 mt-1.5 leading-relaxed">
+                  No delivery fee applies for pickup orders.
+                </p>
               </div>
 
               <div>
@@ -752,6 +1022,7 @@ $conn->close();
                 </p>
                 <div
                   class="border border-gray-200 divide-y divide-gray-100 overflow-hidden rounded-[3px]">
+                  <?php if (!$isGuestCustomer): ?>
                   <label
                     class="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors">
                     <input
@@ -775,12 +1046,14 @@ $conn->close();
                       </p>
                     </div>
                   </label>
+                  <?php endif; ?>
                   <label
                     class="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors">
                     <input
                       type="radio"
                       name="paymentMethod"
                       value="gcash"
+                      <?php echo $isGuestCustomer ? 'checked' : ''; ?>
                       class="accent-emerald-600 w-3.5 h-3.5 shrink-0" />
                     <div
                       class="w-9 h-9 bg-gray-100 flex items-center justify-center shrink-0 rounded-[3px]">
@@ -1123,7 +1396,7 @@ $conn->close();
   <script>
     let cartItems = <?php echo json_encode($initialCart); ?>;
     let savedLocation = "";
-    let globalOrderType = "delivery";
+    let globalOrderType = <?php echo $isGuestCustomer ? '"pickup"' : '"delivery"'; ?>;
     let currentModalStallId = null;
     let currentModalStall = null;
     let initialNoteValue = "";
@@ -1166,7 +1439,6 @@ $conn->close();
     }
 
     let toastHideTimeout = null;
-    let toastRemoveTimeout = null;
 
     function showToast(message) {
       const toast = document.getElementById("toast");
@@ -1174,23 +1446,13 @@ $conn->close();
       toastMessage.textContent = message;
 
       if (toastHideTimeout) clearTimeout(toastHideTimeout);
-      if (toastRemoveTimeout) clearTimeout(toastRemoveTimeout);
 
       toast.classList.remove("hidden");
       toast.classList.add("flex");
 
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          toast.classList.add("toast-visible");
-        });
-      });
-
       toastHideTimeout = setTimeout(() => {
-        toast.classList.remove("toast-visible");
-        toastRemoveTimeout = setTimeout(() => {
-          toast.classList.add("hidden");
-          toast.classList.remove("flex");
-        }, 250);
+        toast.classList.add("hidden");
+        toast.classList.remove("flex");
       }, 2000);
     }
 
@@ -1738,10 +2000,14 @@ $conn->close();
           checkoutBtn.disabled = false;
 
           if (res.success) {
+            if (res.requires_redirect) {
+              window.location.href = res.checkout_url;
+              return;
+            }
             window.location.href =
               "order-success.php?count=" + encodeURIComponent(res.order_count);
           } else {
-            alert(res.message || "Something went wrong. Please try again.");
+            alert((res.message || "Something went wrong. Please try again.") + (res.debug ? "\n\nDEBUG: " + res.debug : ""));
           }
         });
     }

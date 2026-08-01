@@ -115,7 +115,7 @@ function saveProofImage($base64Data)
 function fetchOrdersData($conn, $ownerId)
 {
   $stmt = $conn->prepare("
-        SELECT o.order_id, o.order_type, o.status, o.payment_method,
+        SELECT o.order_id, o.order_type, o.status, o.payment_method, o.payment_status,
                o.total_amount, o.total_delivery_fee, o.grand_total,
                o.drop_off_location, o.note, o.cancel_reason, o.customer_confirmed,
                o.delivery_proof_image, o.created_at,
@@ -151,7 +151,7 @@ function fetchOrdersData($conn, $ownerId)
 
     $orders[$orderIdRaw] = [
       'orderIdRaw' => $orderIdRaw,
-      'id' => 'FC-' . str_pad($orderIdRaw, 6, '0', STR_PAD_LEFT),
+      'id' => 'ORD-' . date('Y', strtotime($row['created_at'])) . '-' . str_pad($orderIdRaw, 6, '0', STR_PAD_LEFT),
       'date' => date('M j, Y', strtotime($row['created_at'])) . ' · ' . date('g:i A', strtotime($row['created_at'])),
       'customerName' => trim($row['cust_first_name'] . ' ' . $row['cust_last_name']),
       'customerType' => $row['customer_type'],
@@ -160,6 +160,8 @@ function fetchOrdersData($conn, $ownerId)
       'orderType' => $row['order_type'],
       'status' => $row['status'],
       'payment' => formatPaymentLabel($row['payment_method'], $row['order_type']),
+      'paymentMethod' => $row['payment_method'],
+      'paymentStatus' => $row['payment_status'],
       'location' => $row['drop_off_location'],
       'note' => $row['note'],
       'cancelReason' => $row['cancel_reason'],
@@ -226,7 +228,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
 
-    $stmt = $conn->prepare("SELECT status, customer_id FROM orders WHERE order_id = ? AND owner_id = ? LIMIT 1");
+    $stmt = $conn->prepare("SELECT status, customer_id, created_at FROM orders WHERE order_id = ? AND owner_id = ? LIMIT 1");
     $stmt->bind_param("ii", $orderId, $ownerId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
@@ -250,7 +252,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $stmt->close();
 
     if ($ok) {
-      $friendlyOrderId = 'FC-' . str_pad($orderId, 6, '0', STR_PAD_LEFT);
+      $friendlyOrderId = 'ORD-' . date('Y', strtotime($row['created_at'])) . '-' . str_pad($orderId, 6, '0', STR_PAD_LEFT);
       createNotification(
         $conn,
         'customer',
@@ -277,7 +279,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
 
-    $stmt = $conn->prepare("SELECT status, order_type, customer_id FROM orders WHERE order_id = ? AND owner_id = ? LIMIT 1");
+    $stmt = $conn->prepare("SELECT status, order_type, customer_id, created_at FROM orders WHERE order_id = ? AND owner_id = ? LIMIT 1");
     $stmt->bind_param("ii", $orderId, $ownerId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
@@ -303,7 +305,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $stmt->close();
 
     if ($ok) {
-      $friendlyOrderId = 'FC-' . str_pad($orderId, 6, '0', STR_PAD_LEFT);
+      $friendlyOrderId = 'ORD-' . date('Y', strtotime($row['created_at'])) . '-' . str_pad($orderId, 6, '0', STR_PAD_LEFT);
       $readyMessage = $row['order_type'] === 'delivery'
         ? 'Your order ' . $friendlyOrderId . ' is ready and waiting for delivery staff!'
         : 'Your order ' . $friendlyOrderId . ' is ready for pickup!';
@@ -359,7 +361,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
 
-    $stmt = $conn->prepare("SELECT status, order_type, customer_id FROM orders WHERE order_id = ? AND owner_id = ? LIMIT 1");
+    $stmt = $conn->prepare("SELECT status, order_type, customer_id, created_at, payment_method FROM orders WHERE order_id = ? AND owner_id = ? LIMIT 1");
     $stmt->bind_param("ii", $orderId, $ownerId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
@@ -384,13 +386,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
 
-    $stmt = $conn->prepare("UPDATE orders SET status = 'completed', delivery_proof_image = ?, proof_captured_at = NOW() WHERE order_id = ? AND owner_id = ?");
+    if ($row['payment_method'] === 'cash') {
+      $stmt = $conn->prepare("UPDATE orders SET status = 'completed', payment_status = 'paid', delivery_proof_image = ?, proof_captured_at = NOW() WHERE order_id = ? AND owner_id = ?");
+    } else {
+      $stmt = $conn->prepare("UPDATE orders SET status = 'completed', delivery_proof_image = ?, proof_captured_at = NOW() WHERE order_id = ? AND owner_id = ?");
+    }
     $stmt->bind_param("sii", $proofImage, $orderId, $ownerId);
     $ok = $stmt->execute();
     $stmt->close();
 
     if ($ok) {
-      $friendlyOrderId = 'FC-' . str_pad($orderId, 6, '0', STR_PAD_LEFT);
+      $friendlyOrderId = 'ORD-' . date('Y', strtotime($row['created_at'])) . '-' . str_pad($orderId, 6, '0', STR_PAD_LEFT);
       createNotification(
         $conn,
         'customer',
@@ -418,7 +424,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
 
-    $stmt = $conn->prepare("SELECT status, customer_id FROM orders WHERE order_id = ? AND owner_id = ? LIMIT 1");
+    $stmt = $conn->prepare("SELECT status, customer_id, created_at FROM orders WHERE order_id = ? AND owner_id = ? LIMIT 1");
     $stmt->bind_param("ii", $orderId, $ownerId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
@@ -442,7 +448,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $stmt->close();
 
     if ($ok) {
-      $friendlyOrderId = 'FC-' . str_pad($orderId, 6, '0', STR_PAD_LEFT);
+      $friendlyOrderId = 'ORD-' . date('Y', strtotime($row['created_at'])) . '-' . str_pad($orderId, 6, '0', STR_PAD_LEFT);
       createNotification(
         $conn,
         'customer',
@@ -1154,22 +1160,35 @@ $conn->close();
         }
         <div>
           <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">${order.orderType === "pickup" ? "Pickup" : "Delivery"} Information</h3>
-          <div class="border border-gray-100 p-3 space-y-2 rounded-md">
+          <div class="border border-gray-100 p-3 space-y-3 rounded-md">
             <div class="flex items-center justify-between">
               <span class="text-[10px] text-gray-500">Order Type</span>
               <span class="text-xs font-medium text-gray-800">${order.orderType === "pickup" ? "Pickup" : "Delivery"}</span>
             </div>
             ${
               order.orderType === "delivery"
-                ? `<div class="flex items-center justify-between">
-                    <span class="text-[10px] text-gray-500">Drop-off Location</span>
-                    <span class="text-xs font-medium text-gray-800 text-right">${escapeHtml(order.location)}</span>
+                ? `<div class="flex items-start gap-3">
+                    <span class="w-8 h-8 bg-gray-100 flex items-center justify-center shrink-0 rounded-[3px]">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" /></svg>
+                    </span>
+                    <div class="flex-1">
+                      <p class="text-[10px] text-gray-500">Drop-off Location</p>
+                      <p class="text-xs font-medium text-gray-800">${escapeHtml(order.location)}</p>
+                    </div>
                   </div>`
                 : ""
             }
-            <div class="flex items-center justify-between">
-              <span class="text-[10px] text-gray-500">Payment Method</span>
-              <span class="text-xs font-medium text-gray-800">${escapeHtml(order.payment)}</span>
+            <div class="flex items-start gap-3">
+              <span class="w-8 h-8 bg-gray-100 flex items-center justify-center shrink-0 rounded-[3px]">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" /></svg>
+              </span>
+              <div class="flex-1">
+                <div class="flex items-center justify-between">
+                  <p class="text-[10px] text-gray-500">Payment Method</p>
+                  <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-[3px] ${order.paymentStatus === "paid" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-600 border border-red-200"}">${order.paymentStatus === "paid" ? "Paid" : "Unpaid"}</span>
+                </div>
+                <p class="text-xs font-medium text-gray-800">${escapeHtml(order.payment)}</p>
+              </div>
             </div>
           </div>
         </div>

@@ -176,6 +176,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
 
+    $agreedTerms = ($_POST['agree_terms'] ?? '') === '1';
+    if (!$agreedTerms) {
+      echo json_encode(['success' => false, 'message' => 'Please agree to the Terms of Service & Privacy Policy to continue.']);
+      exit;
+    }
+
     $password = password_hash($password, PASSWORD_DEFAULT);
 
     if (isEmailRegisteredAnywhere($conn, $email)) {
@@ -592,6 +598,14 @@ $conn->close();
             <p class="text-[10px] mt-1.5 hidden" id="matchMsg"></p>
           </div>
 
+          <label class="flex items-start gap-2 cursor-pointer">
+            <input type="checkbox" id="agreeTermsCheckbox" class="accent-emerald-600 shrink-0 mt-0.5" />
+            <span class="text-[11px] text-gray-500 leading-relaxed">
+              I agree to the
+              <button type="button" id="openTermsPrivacyBtn" class="text-emerald-600 font-semibold underline">Terms of Service &amp; Privacy Policy</button>
+            </span>
+          </label>
+
           <button
             type="button"
             id="submitBtn"
@@ -742,6 +756,90 @@ $conn->close();
             </svg>
             <span id="codeVerifyBtnText">Verify &amp; Create Account</span>
           </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="termsPrivacyModal"
+      class="fixed inset-0 z-[70] hidden flex items-center justify-center px-4"
+    >
+      <div class="modal-overlay absolute inset-0" id="closeTermsPrivacyOverlay"></div>
+      <div class="bg-white w-full max-w-lg max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl rounded-md">
+        <div class="p-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
+          <h2 class="font-bold text-gray-800 text-sm">Terms of Service &amp; Privacy Policy</h2>
+          <button id="closeTermsPrivacyBtn" class="p-1 hover:bg-gray-100 rounded-[3px]">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div class="p-4 space-y-4 text-[11px] text-gray-600 leading-relaxed">
+          <p class="text-[10px] text-gray-400">Last updated: <?php echo date('F Y'); ?></p>
+
+          <div>
+            <p class="text-xs font-bold text-gray-800 mb-1.5">Terms of Service</p>
+            <div class="space-y-2">
+              <div>
+                <p class="text-[11px] font-semibold text-gray-700">1. Who Can Use This App</p>
+                <p>This ordering system is for the NWSSU community and campus visitors. Campus users (students, faculty, and staff) sign up using their official ID number. Guests may sign up using a valid email address.</p>
+              </div>
+              <div>
+                <p class="text-[11px] font-semibold text-gray-700">2. Your Account</p>
+                <p>You are responsible for keeping your password secure and for all activity under your account. Please make sure your contact number and email are accurate, as stalls and delivery staff use them to reach you about your order.</p>
+              </div>
+              <div>
+                <p class="text-[11px] font-semibold text-gray-700">3. Orders and Payment</p>
+                <p>Orders can be paid via cash, GCash, or PayMaya. We may also enable online payments through PayMongo in test mode as we continue developing this system; no real charges will be processed while it remains in test mode. Menu prices and stall availability may change without prior notice.</p>
+              </div>
+              <div>
+                <p class="text-[11px] font-semibold text-gray-700">4. Cancellations</p>
+                <p>Orders already being prepared or out for delivery may no longer be cancelled. Repeated unjustified cancellations or no-shows may result in account restrictions.</p>
+              </div>
+              <div>
+                <p class="text-[11px] font-semibold text-gray-700">5. Acceptable Use</p>
+                <p>Please do not use this app to harass stall owners, delivery staff, or other customers, or to submit false orders or payment information.</p>
+              </div>
+              <div>
+                <p class="text-[11px] font-semibold text-gray-700">6. Changes to These Terms</p>
+                <p>These terms may be updated as the system develops. Continued use of the app after changes means you accept the updated terms.</p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <p class="text-xs font-bold text-gray-800 mb-1.5">Privacy Policy</p>
+            <div class="space-y-2">
+              <div>
+                <p class="text-[11px] font-semibold text-gray-700">1. Information We Collect</p>
+                <p>We collect your name, contact number, email, and (for campus users) ID number, along with your order history and delivery location, so we can process and deliver your orders.</p>
+              </div>
+              <div>
+                <p class="text-[11px] font-semibold text-gray-700">2. How We Use Your Information</p>
+                <p>Your information is used to create and manage your account, process orders, communicate order updates, and send optional push notifications you choose to enable.</p>
+              </div>
+              <div>
+                <p class="text-[11px] font-semibold text-gray-700">3. Who Can See Your Information</p>
+                <p>Stall owners and delivery staff can only see the order and contact details needed to fulfill your specific order. Admins can access account information to manage the platform. We do not sell or share your information with outside companies.</p>
+              </div>
+              <div>
+                <p class="text-[11px] font-semibold text-gray-700">4. Payment Information</p>
+                <p>If online payment via PayMongo is enabled, it currently runs in test mode only, meaning no real money or real card/GCash details are processed through it. Once live, payment details are handled directly by PayMongo and are not stored on our servers.</p>
+              </div>
+              <div>
+                <p class="text-[11px] font-semibold text-gray-700">5. Data Security</p>
+                <p>Passwords are encrypted (hashed) and cannot be viewed by anyone, including admins. Access to the system requires a valid login session.</p>
+              </div>
+              <div>
+                <p class="text-[11px] font-semibold text-gray-700">6. Your Choices</p>
+                <p>You can update your profile information anytime in Account Settings, and turn push notifications on or off from the Notifications setting. You may also permanently delete your account at any time using the Delete My Account option; this removes your profile and order history from our system and cannot be undone.</p>
+              </div>
+              <div>
+                <p class="text-[11px] font-semibold text-gray-700">7. Questions</p>
+                <p>For concerns about your data, please contact the NWSSU Food Court administrator.</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1015,6 +1113,10 @@ $conn->close();
           markError(confirmPassword);
           return;
         }
+        if (!document.getElementById("agreeTermsCheckbox").checked) {
+          showError("Please agree to the Terms of Service & Privacy Policy to continue.");
+          return;
+        }
 
         setSubmitLoading(true);
 
@@ -1025,6 +1127,7 @@ $conn->close();
           email: em,
           password: pw,
           confirm_password: cpw,
+          agree_terms: document.getElementById("agreeTermsCheckbox").checked ? "1" : "0",
         });
 
         setSubmitLoading(false);
@@ -1038,6 +1141,20 @@ $conn->close();
       }
 
       submitBtn.addEventListener("click", handleSubmit);
+
+      const termsPrivacyModal = document.getElementById("termsPrivacyModal");
+      document.getElementById("openTermsPrivacyBtn").addEventListener("click", () => {
+        termsPrivacyModal.classList.remove("hidden");
+        document.body.style.overflow = "hidden";
+      });
+      document.getElementById("closeTermsPrivacyBtn").addEventListener("click", () => {
+        termsPrivacyModal.classList.add("hidden");
+        document.body.style.overflow = "";
+      });
+      document.getElementById("closeTermsPrivacyOverlay").addEventListener("click", () => {
+        termsPrivacyModal.classList.add("hidden");
+        document.body.style.overflow = "";
+      });
 
       const codeModal = document.getElementById("codeModal");
       const codeModalEmail = document.getElementById("codeModalEmail");
