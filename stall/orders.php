@@ -308,7 +308,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       $friendlyOrderId = 'ORD-' . date('Y', strtotime($row['created_at'])) . '-' . str_pad($orderId, 6, '0', STR_PAD_LEFT);
       $readyMessage = $row['order_type'] === 'delivery'
         ? 'Your order ' . $friendlyOrderId . ' is ready and waiting for delivery staff!'
-        : 'Your order ' . $friendlyOrderId . ' is ready for pickup!';
+        : 'Your order ' . $friendlyOrderId . ' is ready for pickup. Please proceed to the stall to collect your order.';
       createNotification(
         $conn,
         'customer',
@@ -1047,7 +1047,7 @@ $conn->close();
       } else if (order.status === "ready_for_pickup" && order.orderType === "pickup") {
         actionButtonsHTML += `<button class="mark-completed-btn flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 rounded-[3px]" data-id="${order.orderIdRaw}">Mark Completed</button>`;
       } else if (order.status === "ready_for_dispatch" && order.orderType === "delivery") {
-        actionButtonsHTML += `<button class="flex-1 py-2 border border-gray-200 text-gray-400 text-xs font-semibold cursor-not-allowed opacity-60 flex items-center justify-center gap-1.5 rounded-[3px]" disabled>Awaiting Pickup by Staff</button>`;
+        actionButtonsHTML += `<button class="flex-1 py-2 border border-gray-200 text-gray-400 text-xs font-semibold cursor-not-allowed opacity-60 flex items-center justify-center gap-1.5 rounded-[3px]" disabled>Awaiting Pickup</button>`;
       } else if (order.status === "collected") {
         actionButtonsHTML += `<button class="flex-1 py-2 border border-gray-200 text-gray-400 text-xs font-semibold cursor-not-allowed opacity-60 flex items-center justify-center gap-1.5 rounded-[3px]" disabled>Collected by Staff</button>`;
       } else if (order.status === "out_for_delivery") {
@@ -1161,10 +1161,6 @@ $conn->close();
         <div>
           <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">${order.orderType === "pickup" ? "Pickup" : "Delivery"} Information</h3>
           <div class="border border-gray-100 p-3 space-y-3 rounded-md">
-            <div class="flex items-center justify-between">
-              <span class="text-[10px] text-gray-500">Order Type</span>
-              <span class="text-xs font-medium text-gray-800">${order.orderType === "pickup" ? "Pickup" : "Delivery"}</span>
-            </div>
             ${
               order.orderType === "delivery"
                 ? `<div class="flex items-start gap-3">

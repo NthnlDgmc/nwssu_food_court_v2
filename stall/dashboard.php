@@ -94,6 +94,12 @@ function fetchDashboardStats($conn, $ownerId)
   $todaysOrders = (int) $stmt->get_result()->fetch_assoc()['cnt'];
   $stmt->close();
 
+  $stmt = $conn->prepare("SELECT COALESCE(SUM(grand_total), 0) AS total FROM orders WHERE owner_id = ? AND DATE(created_at) = CURDATE() AND status != 'cancelled'");
+  $stmt->bind_param("i", $ownerId);
+  $stmt->execute();
+  $todaysSales = (float) $stmt->get_result()->fetch_assoc()['total'];
+  $stmt->close();
+
   $stmt = $conn->prepare("SELECT COUNT(*) AS cnt FROM menu_items WHERE owner_id = ?");
   $stmt->bind_param("i", $ownerId);
   $stmt->execute();
@@ -103,6 +109,7 @@ function fetchDashboardStats($conn, $ownerId)
   return [
     'pendingOrders' => $pendingOrders,
     'todaysOrders' => $todaysOrders,
+    'todaysSales' => $todaysSales,
     'menuItemsCount' => $menuItemsCount,
   ];
 }
@@ -624,12 +631,12 @@ $conn->close();
             <p class="text-[10px] text-gray-400 mt-0.5" id="statusOverviewSubtitle">Delivery orders by status</p>
           </div>
           <div class="p-4">
-            <div class="relative flex bg-gray-100 p-1 rounded-full mb-4 max-w-[200px]" id="statusTypeTabs">
+            <div class="relative flex bg-gray-100 p-1 mb-4 max-w-[200px] rounded-[3px]" id="statusTypeTabs">
               <div
                 id="statusTypeIndicator"
-                class="absolute top-1 bottom-1 bg-white shadow-sm rounded-full transition-all duration-300 ease-out"></div>
-              <button type="button" data-type="delivery" class="status-type-tab relative z-10 flex-1 py-1.5 text-[11px] font-semibold rounded-full transition-colors duration-200">Delivery</button>
-              <button type="button" data-type="pickup" class="status-type-tab relative z-10 flex-1 py-1.5 text-[11px] font-semibold rounded-full transition-colors duration-200">Pickup</button>
+                class="absolute top-1 bottom-1 bg-white shadow-sm transition-all duration-300 ease-out rounded-[3px]"></div>
+              <button type="button" data-type="delivery" class="status-type-tab relative z-10 flex-1 py-1.5 text-[11px] font-semibold transition-colors duration-200 rounded-[3px]">Delivery</button>
+              <button type="button" data-type="pickup" class="status-type-tab relative z-10 flex-1 py-1.5 text-[11px] font-semibold transition-colors duration-200 rounded-[3px]">Pickup</button>
             </div>
 
             <div class="flex items-center gap-5" id="statusChartRow">
@@ -784,7 +791,7 @@ $conn->close();
       },
       {
         label: "Today's Sales",
-        value: "₱3,250.00",
+        value: "₱" + dashboardStats.todaysSales.toFixed(2),
         accent: "emerald",
         href: "./report.php",
         icon: '<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />',

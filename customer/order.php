@@ -580,37 +580,6 @@ $conn->close();
         -ms-overflow-style: none;
         scrollbar-width: none;
       }
-      #cancelReasonsContainer {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-      }
-      .reason-option {
-        display: inline-flex;
-      }
-      .reason-option input[type="radio"] {
-        display: none;
-      }
-      .reason-option label {
-        display: inline-flex;
-        align-items: center;
-        padding: 7px 12px;
-        border: 1px solid #e5e7eb;
-        cursor: pointer;
-        font-size: 12px;
-        color: #4b5563;
-        background: #f9fafb;
-        line-height: 1.2;
-      }
-      .reason-option input[type="radio"]:checked + label {
-        border-color: #059669;
-        background: #059669;
-        color: #fff;
-        font-weight: 600;
-      }
-      .reason-option .radio-dot {
-        display: none;
-      }
       #otherReasonWrapper {
         width: 100%;
       }
@@ -979,98 +948,41 @@ $conn->close();
           </p>
         </div>
         <div class="px-4 py-3" id="cancelReasonsContainer">
-          <div class="reason-option">
-            <input
-              type="radio"
-              name="cancelReason"
-              id="reason1"
-              value="I changed my mind"
-            />
-            <label for="reason1" class="rounded-full"
-              ><span class="radio-dot"></span>I changed my mind</label
-            >
+          <div class="border border-gray-200 divide-y divide-gray-100 rounded-[3px]">
+            <label class="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors">
+              <input type="radio" name="cancelReason" value="I changed my mind" class="accent-emerald-600 w-3.5 h-3.5 shrink-0" />
+              <span class="text-xs text-gray-700">I changed my mind</span>
+            </label>
+            <label class="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors">
+              <input type="radio" name="cancelReason" value="I ordered the wrong item" class="accent-emerald-600 w-3.5 h-3.5 shrink-0" />
+              <span class="text-xs text-gray-700">I ordered the wrong item</span>
+            </label>
+            <label class="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors">
+              <input type="radio" name="cancelReason" value="I selected the wrong stall" class="accent-emerald-600 w-3.5 h-3.5 shrink-0" />
+              <span class="text-xs text-gray-700">I selected the wrong stall</span>
+            </label>
+            <label class="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors">
+              <input type="radio" name="cancelReason" value="I want to change my order" class="accent-emerald-600 w-3.5 h-3.5 shrink-0" />
+              <span class="text-xs text-gray-700">I want to change my order</span>
+            </label>
+            <label class="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors">
+              <input type="radio" name="cancelReason" value="The order is taking too long" class="accent-emerald-600 w-3.5 h-3.5 shrink-0" />
+              <span class="text-xs text-gray-700">The order is taking too long</span>
+            </label>
+            <label class="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors">
+              <input type="radio" name="cancelReason" value="I want to change my payment method" class="accent-emerald-600 w-3.5 h-3.5 shrink-0" />
+              <span class="text-xs text-gray-700">I want to change my payment method</span>
+            </label>
+            <label class="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors">
+              <input type="radio" name="cancelReason" value="I no longer need this order" class="accent-emerald-600 w-3.5 h-3.5 shrink-0" />
+              <span class="text-xs text-gray-700">I no longer need this order</span>
+            </label>
+            <label class="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors">
+              <input type="radio" name="cancelReason" value="other" class="accent-emerald-600 w-3.5 h-3.5 shrink-0" />
+              <span class="text-xs text-gray-700">Other reason</span>
+            </label>
           </div>
-          <div class="reason-option">
-            <input
-              type="radio"
-              name="cancelReason"
-              id="reason2"
-              value="I ordered the wrong item"
-            />
-            <label for="reason2" class="rounded-full"
-              ><span class="radio-dot"></span>I ordered the wrong item</label
-            >
-          </div>
-          <div class="reason-option">
-            <input
-              type="radio"
-              name="cancelReason"
-              id="reason3"
-              value="I ordered from the wrong stall"
-            />
-            <label for="reason3" class="rounded-full"
-              ><span class="radio-dot"></span>I ordered from the wrong
-              stall</label
-            >
-          </div>
-          <div class="reason-option">
-            <input
-              type="radio"
-              name="cancelReason"
-              id="reason4"
-              value="I want to change my delivery location"
-            />
-            <label for="reason4" class="rounded-full"
-              ><span class="radio-dot"></span>I want to change my delivery
-              location</label
-            >
-          </div>
-          <div class="reason-option">
-            <input
-              type="radio"
-              name="cancelReason"
-              id="reason5"
-              value="I want to change my payment method"
-            />
-            <label for="reason5" class="rounded-full"
-              ><span class="radio-dot"></span>I want to change my payment
-              method</label
-            >
-          </div>
-          <div class="reason-option">
-            <input
-              type="radio"
-              name="cancelReason"
-              id="reason6"
-              value="The food takes too long"
-            />
-            <label for="reason6" class="rounded-full"
-              ><span class="radio-dot"></span>The food takes too long</label
-            >
-          </div>
-          <div class="reason-option">
-            <input
-              type="radio"
-              name="cancelReason"
-              id="reason7"
-              value="I want to add more items"
-            />
-            <label for="reason7" class="rounded-full"
-              ><span class="radio-dot"></span>I want to add more items</label
-            >
-          </div>
-          <div class="reason-option">
-            <input
-              type="radio"
-              name="cancelReason"
-              id="reason8"
-              value="other"
-            />
-            <label for="reason8" class="rounded-full"
-              ><span class="radio-dot"></span>Other reason</label
-            >
-          </div>
-          <div id="otherReasonWrapper" class="hidden pt-1">
+          <div id="otherReasonWrapper" class="hidden pt-3">
             <textarea
               id="otherReasonText"
               rows="2"

@@ -345,33 +345,16 @@ $conn->close();
 
     <div class="min-h-screen flex items-center justify-center px-4 py-10">
       <div class="w-full max-w-sm">
+        <div class="text-center mb-5">
+          <h1 class="text-base font-semibold text-emerald-600">
+            Forgot Password?
+          </h1>
+          <p class="text-xs text-gray-500 mt-1">
+            Enter your email and we'll send you a code to reset your
+            password.
+          </p>
+        </div>
         <div class="rounded-md bg-white border border-gray-200 shadow-sm p-4 space-y-4">
-          <div class="text-center">
-            <div class="w-14 h-14 bg-emerald-50 flex items-center justify-center mx-auto mb-3 rounded-full">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke-width="1.5"
-                stroke="currentColor"
-                class="w-7 h-7 text-emerald-600"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z"
-                />
-              </svg>
-            </div>
-            <h1 class="text-base font-semibold text-emerald-600">
-              Forgot Password?
-            </h1>
-            <p class="text-xs text-gray-500 mt-1 max-w-xs mx-auto">
-              Enter your email and we'll send you a code to reset your
-              password.
-            </p>
-          </div>
-
           <div
             id="errorBanner"
             role="alert"

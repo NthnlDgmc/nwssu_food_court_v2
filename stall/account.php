@@ -325,17 +325,6 @@ if (!$initialProfile) {
     input.error {
       border-color: #f87171;
     }
-
-    #toast {
-      opacity: 0;
-      transform: translate(-50%, 8px);
-      transition: opacity 0.25s ease, transform 0.25s ease;
-    }
-
-    #toast.toast-visible {
-      opacity: 1;
-      transform: translate(-50%, 0);
-    }
   </style>
 </head>
 
@@ -1111,7 +1100,6 @@ if (!$initialProfile) {
     }
 
     let toastHideTimeout = null;
-    let toastRemoveTimeout = null;
 
     function showToast(message) {
       const toast = document.getElementById("toast");
@@ -1119,23 +1107,13 @@ if (!$initialProfile) {
       toastMessage.textContent = message;
 
       if (toastHideTimeout) clearTimeout(toastHideTimeout);
-      if (toastRemoveTimeout) clearTimeout(toastRemoveTimeout);
 
       toast.classList.remove("hidden");
       toast.classList.add("flex");
 
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          toast.classList.add("toast-visible");
-        });
-      });
-
       toastHideTimeout = setTimeout(() => {
-        toast.classList.remove("toast-visible");
-        toastRemoveTimeout = setTimeout(() => {
-          toast.classList.add("hidden");
-          toast.classList.remove("flex");
-        }, 250);
+        toast.classList.add("hidden");
+        toast.classList.remove("flex");
       }, 2000);
     }
 
@@ -1516,7 +1494,6 @@ if (!$initialProfile) {
     }
 
     let initialBusinessHours = {};
-
     function checkForBusinessHoursChanges() {
       const changed =
         document.getElementById("fieldOpensAt").value !== initialBusinessHours.opensAt ||
