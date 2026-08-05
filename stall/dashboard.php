@@ -94,7 +94,7 @@ function fetchDashboardStats($conn, $ownerId)
   $todaysOrders = (int) $stmt->get_result()->fetch_assoc()['cnt'];
   $stmt->close();
 
-  $stmt = $conn->prepare("SELECT COALESCE(SUM(grand_total), 0) AS total FROM orders WHERE owner_id = ? AND DATE(created_at) = CURDATE() AND status != 'cancelled'");
+  $stmt = $conn->prepare("SELECT COALESCE(SUM(grand_total), 0) AS total FROM orders WHERE owner_id = ? AND DATE(created_at) = CURDATE() AND status IN ('delivered', 'completed')");
   $stmt->bind_param("i", $ownerId);
   $stmt->execute();
   $todaysSales = (float) $stmt->get_result()->fetch_assoc()['total'];
@@ -525,6 +525,23 @@ $conn->close();
 
     <div class="flex-1 overflow-y-auto mt-12 mb-16" id="mainContent">
       <div class="max-w-5xl mx-auto px-4 pt-3 pb-4 flex flex-col gap-4" id="dashboardContent">
+        <div id="pushPromptBanner" class="hidden bg-emerald-50 border border-emerald-200 p-3 rounded-md">
+          <div class="flex items-center gap-2.5">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-emerald-600 shrink-0">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+            </svg>
+            <div class="flex-1 min-w-0">
+              <p class="text-xs font-semibold text-gray-800">Stay updated on new orders</p>
+              <p class="text-[10px] text-gray-500 mt-0.5">Turn on notifications so you never miss an order.</p>
+            </div>
+            <button id="pushEnableBtn" class="shrink-0 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold rounded-[3px]">Enable</button>
+            <button id="pushDismissBtn" class="shrink-0 p-1 hover:bg-emerald-100 rounded-[3px]">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-400">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
         <?php if ($myStall): ?>
           <div class="bg-white border border-gray-200 shadow-sm rounded-md p-3 flex items-center justify-between gap-3">
             <div class="flex items-center gap-2.5 min-w-0">
@@ -547,24 +564,6 @@ $conn->close();
             </label>
           </div>
         <?php endif; ?>
-
-        <div id="pushPromptBanner" class="hidden bg-emerald-50 border border-emerald-200 p-3 rounded-md">
-          <div class="flex items-center gap-2.5">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-emerald-600 shrink-0">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
-            </svg>
-            <div class="flex-1 min-w-0">
-              <p class="text-xs font-semibold text-gray-800">Stay updated on new orders</p>
-              <p class="text-[10px] text-gray-500 mt-0.5">Turn on notifications so you never miss an order.</p>
-            </div>
-            <button id="pushEnableBtn" class="shrink-0 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold rounded-[3px]">Enable</button>
-            <button id="pushDismissBtn" class="shrink-0 p-1 hover:bg-emerald-100 rounded-[3px]">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-400">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
 
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" id="statsGrid"></div>
 

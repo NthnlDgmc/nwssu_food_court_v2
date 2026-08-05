@@ -243,35 +243,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             "
           />
           <h1 class="text-base font-semibold text-emerald-600">
-            NwSSU Food Court
+            Welcome
           </h1>
           <p class="text-xs text-gray-500 mt-1">
-            Pickup &middot; Campus Delivery &middot; Fast &amp; Fresh
+            Sign in to continue
           </p>
-          <span
-            class="rounded-full inline-flex items-center gap-1 mt-3 px-3 py-1.5 bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-semibold"
-          >
-            <svg
-              class="w-3 h-3 shrink-0"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke-width="2"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
-              />
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"
-              />
-            </svg>
-            University Avenue, Main Campus
-          </span>
         </div>
 
         <div class="rounded-md bg-white border border-gray-200 shadow-sm p-4 space-y-4">

@@ -3,6 +3,7 @@ session_start();
 require_once '../config/database.php';
 require_once '../config/vapid.php';
 require_once '../config/version.php';
+require_once '../config/app-url.php';
 
 if (!isset($_SESSION['owner_id'])) {
   header('Location: ../auth/login.php');
@@ -359,7 +360,14 @@ if (!$initialProfile) {
     <div class="flex-1 overflow-y-auto mt-12 mb-16" id="mainContent">
       <div class="max-w-5xl mx-auto px-4 pt-3 pb-4 space-y-3">
         <div class="rounded-md bg-white border border-gray-200 shadow-sm p-4">
-          <div class="flex items-center gap-3">
+          <div id="profileSkeleton" class="flex items-center gap-3 animate-pulse">
+            <div class="w-16 h-16 bg-gray-200 shrink-0 rounded-full"></div>
+            <div class="flex-1 min-w-0 space-y-2">
+              <div class="h-4 bg-gray-200 rounded w-32"></div>
+              <div class="h-3 bg-gray-200 rounded w-40"></div>
+            </div>
+          </div>
+          <div id="profileContent" class="hidden items-center gap-3">
             <div
               id="profileAvatar"
               class="w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-white font-bold text-xl shrink-0 rounded-full overflow-hidden"></div>
@@ -468,14 +476,14 @@ if (!$initialProfile) {
           </div>
           <div class="divide-y divide-gray-100">
             <button
-              class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
-              data-info="For assistance, please message the NWSSU Food Court support team via the Chats tab.">
+              id="shareAppBtn"
+              class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">
               <span class="w-8 h-8 bg-gray-100 flex items-center justify-center shrink-0 rounded-[3px]">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
                 </svg>
               </span>
-              <span class="flex-1 text-xs font-medium text-gray-700">Help Center</span>
+              <span class="flex-1 text-xs font-medium text-gray-700">Share App</span>
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-300 shrink-0">
                 <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
               </svg>
@@ -905,6 +913,38 @@ if (!$initialProfile) {
   </div>
 
   <div
+    id="shareAppModal"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center px-4">
+    <div class="modal-overlay absolute inset-0" id="closeShareAppOverlay"></div>
+    <div
+      class="bg-white w-full max-w-sm relative z-10 shadow-2xl p-5 space-y-4 text-center rounded-md">
+      <div>
+        <p class="text-sm font-bold text-gray-800">Share NWSSU Food Court</p>
+        <p class="text-xs text-gray-500 mt-1">Let a friend scan this code to open the app.</p>
+      </div>
+      <div class="flex items-center justify-center">
+        <div class="p-3 border border-gray-200 rounded-md">
+          <img
+            src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&amp;data=<?php echo urlencode(APP_URL); ?>"
+            alt="App QR Code"
+            class="w-44 h-44" />
+        </div>
+      </div>
+      <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 px-3 py-2.5 rounded-[3px]">
+        <p id="shareAppUrlText" class="flex-1 text-xs text-gray-600 truncate text-left"><?php echo htmlspecialchars(APP_URL); ?></p>
+        <button id="copyShareAppUrlBtn" class="shrink-0 p-1 hover:bg-gray-200 transition-colors rounded-[3px]">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" />
+          </svg>
+        </button>
+      </div>
+      <button id="closeShareAppBtn" class="w-full py-2.5 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors rounded-[3px]">
+        Close
+      </button>
+    </div>
+  </div>
+
+  <div
     id="termsPrivacyModal"
     class="fixed inset-0 z-50 hidden flex items-center justify-center px-4">
     <div class="modal-overlay absolute inset-0" id="closeTermsPrivacyOverlay"></div>
@@ -1273,6 +1313,10 @@ if (!$initialProfile) {
       document.getElementById("profileSubtext").textContent = stallAccount.email;
       document.getElementById("statStallName").textContent = stallAccount.assignedStall;
       document.getElementById("statMemberSince").textContent = stallAccount.memberSince;
+
+      document.getElementById("profileSkeleton").classList.add("hidden");
+      document.getElementById("profileContent").classList.remove("hidden");
+      document.getElementById("profileContent").classList.add("flex");
     }
 
     function updateEditProfilePreview(src, initials) {
@@ -1819,6 +1863,31 @@ if (!$initialProfile) {
       document.getElementById("closeTermsPrivacyOverlay").addEventListener("click", closeModal);
     }
 
+    function setupShareAppModal() {
+      const modal = document.getElementById("shareAppModal");
+      const openModal = () => {
+        modal.classList.remove("hidden");
+        document.body.style.overflow = "hidden";
+      };
+      const closeModal = () => {
+        modal.classList.add("hidden");
+        document.body.style.overflow = "";
+      };
+      document.getElementById("shareAppBtn").addEventListener("click", openModal);
+      document.getElementById("closeShareAppBtn").addEventListener("click", closeModal);
+      document.getElementById("closeShareAppOverlay").addEventListener("click", closeModal);
+
+      document.getElementById("copyShareAppUrlBtn").addEventListener("click", async () => {
+        const url = document.getElementById("shareAppUrlText").textContent;
+        try {
+          await navigator.clipboard.writeText(url);
+          showToast("Link copied to clipboard");
+        } catch (err) {
+          showToast("Failed to copy link");
+        }
+      });
+    }
+
     function setupLogoutModal() {
       document.getElementById("logoutBtn").addEventListener("click", openLogoutModal);
       document.getElementById("closeLogoutOverlay").addEventListener("click", closeLogoutModal);
@@ -1836,6 +1905,7 @@ if (!$initialProfile) {
       setupBusinessHoursModal();
       setupInfoRows();
       setupTermsPrivacyModal();
+      setupShareAppModal();
       setupLogoutModal();
       setupNotificationToggle();
     }

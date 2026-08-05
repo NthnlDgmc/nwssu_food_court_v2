@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment success · check animation</title>
+  <!-- Tailwind via CDN + a touch of custom keyframes -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* custom pulse & check-draw for the "success" vibe */
+    @keyframes pop-in {
+      0% { transform: scale(0.6); opacity: 0; }
+      80% { transform: scale(1.05); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes draw-check {
+      0% { stroke-dashoffset: 60; }
+      100% { stroke-dashoffset: 0; }
+    }
+    @keyframes ring-grow {
+      0% { stroke-dashoffset: 283; }
+      100% { stroke-dashoffset: 0; }
+    }
+    @keyframes soft-glow {
+      0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.3); }
+      70% { box-shadow: 0 0 0 20px rgba(34, 197, 94, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
+    .animate-pop-in {
+      animation: pop-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) forwards;
+    }
+    .animate-draw-check {
+      animation: draw-check 0.6s ease-out 0.3s forwards;
+    }
+    .animate-ring-grow {
+      animation: ring-grow 0.7s ease-out 0.1s forwards;
+    }
+    .animate-glow-pulse {
+      animation: soft-glow 1.2s ease-out 0.2s 2;
+    }
+    /* ring & check SVG helpers */
+    .ring-bg {
+      stroke: #e5e7eb; /* gray-200 */
+    }
+    .ring-progress {
+      stroke: #22c55e; /* green-500 */
+      stroke-linecap: round;
+      stroke-dasharray: 283; /* 2*pi*45 ≈ 282.74 */
+      stroke-dashoffset: 283;
+      transform: rotate(-90deg);
+      transform-origin: 50% 50%;
+    }
+    .check-path {
+      stroke-dasharray: 60;
+      stroke-dashoffset: 60;
+      stroke: #22c55e;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+    .circle-bg {
+      fill: none;
+      stroke: #e5e7eb;
+    }
+    .success-ring {
+      fill: none;
+      stroke: #22c55e;
+      stroke-width: 5;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-white p-4">
+
+  <div class="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-8 text-center transition-all hover:shadow-emerald-100/40 border border-emerald-100/30">
+
+    <!-- main animated icon -->
+    <div class="relative flex justify-center items-center mx-auto w-40 h-40 mb-4 animate-pop-in">
+      
+      <!-- outer ring with progress animation (SVG) -->
+      <svg class="absolute inset-0 w-full h-full" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- background circle (gray) -->
+        <circle cx="60" cy="60" r="45" stroke="#e5e7eb" stroke-width="5" fill="none" />
+        <!-- animated progress ring -->
+        <circle cx="60" cy="60" r="45" stroke="#22c55e" stroke-width="5" 
+                stroke-linecap="round" stroke-dasharray="283" stroke-dashoffset="283"
+                class="animate-ring-grow" 
+                style="transform: rotate(-90deg); transform-origin: 50% 50%;" />
+      </svg>
+
+      <!-- inner checkmark SVG (draws after ring) -->
+      <svg class="absolute inset-0 w-full h-full" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M35 60 L52 77 L88 41" stroke="#22c55e" stroke-width="7" 
+              stroke-linecap="round" stroke-linejoin="round"
+              class="check-path animate-draw-check" />
+      </svg>
+
+      <!-- subtle glowing pulse behind the icon (CSS) -->
+      <div class="absolute inset-0 rounded-full animate-glow-pulse pointer-events-none"></div>
+    </div>
+
+    <!-- success text -->
+    <h2 class="text-3xl font-extrabold text-emerald-700 mt-2 tracking-tight">Payment successful</h2>
+    <p class="text-gray-500 text-sm font-medium mt-1.5">Your transaction has been verified</p>
+
+    <!-- mini receipt / details (just for demo) -->
+    <div class="mt-6 pt-5 border-t border-emerald-100/60 text-left text-sm text-gray-600 space-y-1.5">
+      <div class="flex justify-between"><span class="text-gray-400">Amount</span> <span class="font-semibold text-gray-800">$249.00</span></div>
+      <div class="flex justify-between"><span class="text-gray-400">Reference</span> <span class="font-mono text-gray-700 text-xs">#PAY-4D3C-9F2A</span></div>
+      <div class="flex justify-between"><span class="text-gray-400">Date</span> <span class="text-gray-700">Aug 5, 2026</span></div>
+    </div>
+
+    <!-- "continue" button (optional) -->
+    <button class="mt-6 w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-md shadow-emerald-200 transition-all duration-200 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2">
+      Continue to dashboard
+    </button>
+
+    <!-- tiny footnote: animation check (self-contained) -->
+    <p class="mt-4 text-[10px] text-gray-300 tracking-wider">✓ payment verified · secure</p>
+  </div>
+
+  <!-- optional explanation (accessible) -->
+  <div class="absolute bottom-5 left-0 right-0 text-center text-xs text-gray-300/80 pointer-events-none">
+    <span>check animation · tailwind + css</span>
+  </div>
+</body>
+</html>

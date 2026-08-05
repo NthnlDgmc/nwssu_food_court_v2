@@ -182,6 +182,8 @@ function fetchDeliveriesData($conn, $staffId)
       'note' => $row['note'],
       'cancelReason' => $row['cancel_reason'],
       'deliveryFee' => (float) $row['total_delivery_fee'],
+      'deliveryFee' => (float) $row['total_delivery_fee'],
+      'grandTotal' => (float) $row['grand_total'],
       'items' => [],
     ];
   }
@@ -280,7 +282,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
 
-    $stmt = $conn->prepare("SELECT status, staff_id, customer_id, created_at FROM orders WHERE order_id = ? AND order_type = 'delivery' LIMIT 1");
+    $stmt = $conn->prepare("SELECT status, staff_id, customer_id, owner_id, created_at FROM orders WHERE order_id = ? AND order_type = 'delivery' LIMIT 1");
     $stmt->bind_param("i", $orderId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
@@ -313,6 +315,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         'Your order ' . $friendlyOrderId . ' has been picked up by our delivery staff!',
         '../customer/order.php'
       );
+
+      if ($row['owner_id'] !== null) {
+        createNotification(
+          $conn,
+          'stall_owner',
+          $row['owner_id'],
+          'Order Collected',
+          'Order ' . $friendlyOrderId . ' has been picked up by the delivery staff.',
+          '../stall/orders.php'
+        );
+      }
     }
 
     echo json_encode($ok
@@ -751,22 +764,29 @@ sort($stallOptions);
 
   <div id="collectedModal" class="fixed inset-0 z-[60] hidden flex items-center justify-center px-4">
     <div class="modal-overlay absolute inset-0" id="closeCollectedOverlay"></div>
-    <div class="bg-white w-full max-w-sm relative z-10 shadow-2xl p-5 space-y-4 text-center rounded-md">
-      <div class="w-12 h-12 bg-emerald-50 flex items-center justify-center mx-auto rounded-full">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-emerald-600">
-          <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-        </svg>
+    <div class="bg-white w-full max-w-sm relative z-10 shadow-2xl p-5 rounded-md">
+      <div class="flex items-center gap-2.5 mb-3">
+        <div class="w-8 h-8 bg-emerald-50 flex items-center justify-center shrink-0 rounded-[3px]">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-emerald-600">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+          </svg>
+        </div>
+        <div>
+          <p class="text-sm font-bold text-gray-800">Mark as Collected</p>
+          <p class="text-[10px] text-gray-400 mt-0.5" id="collectedOrderIdLabel"></p>
+        </div>
       </div>
-      <div>
-        <p class="text-sm font-bold text-gray-800">Mark as Collected</p>
-        <p class="text-xs text-gray-500 mt-1">Order <span id="collectedOrderIdLabel" class="font-semibold text-gray-700"></span> will be marked as collected from the stall. Continue?</p>
+      <div class="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-[3px] mb-3">
+        <span class="text-xs text-gray-600" id="collectedSnapshotLeft"></span>
+        <span class="text-xs font-semibold text-gray-800" id="collectedSnapshotTotal"></span>
       </div>
-      <div class="flex gap-2 pt-1">
+      <p class="text-xs text-gray-500 mb-3">This order will be marked as collected from the stall.</p>
+      <div class="flex gap-2">
         <button id="collectedKeepBtn" class="flex-1 py-2.5 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors rounded-[3px]">
           Cancel
         </button>
         <button id="collectedConfirmBtn" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors rounded-[3px]">
-          Yes, Mark Collected
+          Mark Collected
         </button>
       </div>
     </div>
@@ -774,22 +794,29 @@ sort($stallOptions);
 
   <div id="startDeliveryModal" class="fixed inset-0 z-[60] hidden flex items-center justify-center px-4">
     <div class="modal-overlay absolute inset-0" id="closeStartDeliveryOverlay"></div>
-    <div class="bg-white w-full max-w-sm relative z-10 shadow-2xl p-5 space-y-4 text-center rounded-md">
-      <div class="w-12 h-12 bg-emerald-50 flex items-center justify-center mx-auto rounded-full">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-emerald-600">
-          <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-        </svg>
+    <div class="bg-white w-full max-w-sm relative z-10 shadow-2xl p-5 rounded-md">
+      <div class="flex items-center gap-2.5 mb-3">
+        <div class="w-8 h-8 bg-emerald-50 flex items-center justify-center shrink-0 rounded-[3px]">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-emerald-600">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+          </svg>
+        </div>
+        <div>
+          <p class="text-sm font-bold text-gray-800">Start Delivery</p>
+          <p class="text-[10px] text-gray-400 mt-0.5" id="startDeliveryOrderIdLabel"></p>
+        </div>
       </div>
-      <div>
-        <p class="text-sm font-bold text-gray-800">Start Delivery</p>
-        <p class="text-xs text-gray-500 mt-1">Order <span id="startDeliveryOrderIdLabel" class="font-semibold text-gray-700"></span> will be marked out for delivery. Continue?</p>
+      <div class="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-[3px] mb-3">
+        <span class="text-xs text-gray-600" id="startDeliverySnapshotLeft"></span>
+        <span class="text-xs font-semibold text-gray-800" id="startDeliverySnapshotTotal"></span>
       </div>
-      <div class="flex gap-2 pt-1">
+      <p class="text-xs text-gray-500 mb-3">This order will be marked out for delivery.</p>
+      <div class="flex gap-2">
         <button id="startDeliveryKeepBtn" class="flex-1 py-2.5 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors rounded-[3px]">
           Cancel
         </button>
         <button id="startDeliveryConfirmBtn" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors rounded-[3px]">
-          Yes, Start Delivery
+          Start Delivery
         </button>
       </div>
     </div>
@@ -1383,7 +1410,13 @@ sort($stallOptions);
     function openCollectedModal(orderIdRaw) {
       pendingCollectedId = orderIdRaw;
       const delivery = ALL_DELIVERIES.find((d) => d.orderIdRaw === orderIdRaw);
-      document.getElementById("collectedOrderIdLabel").textContent = delivery ? delivery.id : "";
+      if (!delivery) return;
+
+      document.getElementById("collectedOrderIdLabel").textContent = delivery.id;
+      const itemCount = delivery.items.reduce((sum, item) => sum + item.qty, 0);
+      document.getElementById("collectedSnapshotLeft").textContent = `${delivery.customerName} · ${itemCount} item${itemCount !== 1 ? "s" : ""}`;
+      document.getElementById("collectedSnapshotTotal").textContent = "₱" + delivery.grandTotal.toFixed(2);
+
       document.getElementById("collectedModal").classList.remove("hidden");
       document.body.style.overflow = "hidden";
     }
@@ -1397,7 +1430,13 @@ sort($stallOptions);
     function openStartDeliveryModal(orderIdRaw) {
       pendingStartDeliveryId = orderIdRaw;
       const delivery = ALL_DELIVERIES.find((d) => d.orderIdRaw === orderIdRaw);
-      document.getElementById("startDeliveryOrderIdLabel").textContent = delivery ? delivery.id : "";
+      if (!delivery) return;
+
+      document.getElementById("startDeliveryOrderIdLabel").textContent = delivery.id;
+      const itemCount = delivery.items.reduce((sum, item) => sum + item.qty, 0);
+      document.getElementById("startDeliverySnapshotLeft").textContent = `${delivery.customerName} · ${itemCount} item${itemCount !== 1 ? "s" : ""}`;
+      document.getElementById("startDeliverySnapshotTotal").textContent = "₱" + delivery.grandTotal.toFixed(2);
+
       document.getElementById("startDeliveryModal").classList.remove("hidden");
       document.body.style.overflow = "hidden";
     }

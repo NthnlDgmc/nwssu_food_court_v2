@@ -68,7 +68,7 @@ $conn->close();
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NWSSU Food Court - Browse Menu</title>
-  <link rel="icon" href="assets/images/nwssu-logo.png" type="image/png" />
+  <link rel="icon" href="assets/images/nwssu-logo.svg" type="image/svg+xml" />
   <link rel="manifest" href="manifest.json" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -153,6 +153,10 @@ $conn->close();
         transform: translateY(0);
       }
     }
+
+    .modal-overlay {
+      background-color: rgba(0, 0, 0, 0.5);
+    }
   </style>
 </head>
 
@@ -162,7 +166,7 @@ $conn->close();
     <div class="bg-white flex-shrink-0 fixed top-0 left-0 right-0 z-20">
       <div class="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
         <div class="flex items-center gap-2.5 min-w-0">
-          <img src="assets/images/nwssu-logo.png" alt="NWSSU Food Court" class="w-9 h-9 object-contain shrink-0" />
+          <img src="assets/images/nwssu-logo.svg" alt="NWSSU Food Court" class="w-9 h-9 object-contain shrink-0" />
           <div class="min-w-0">
             <p class="text-sm font-bold text-gray-800 leading-tight truncate">
               NWSSU <span class="text-emerald-600">Food Court</span>
@@ -367,6 +371,32 @@ $conn->close();
 
   </div>
 
+  <div
+    id="signInRequiredModal"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center px-4">
+    <div class="modal-overlay absolute inset-0" id="closeSignInRequiredOverlay"></div>
+    <div
+      class="bg-white w-full max-w-sm relative z-10 shadow-2xl p-5 space-y-4 text-center rounded-md">
+      <div class="w-12 h-12 bg-emerald-50 flex items-center justify-center mx-auto rounded-full">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-emerald-600">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+        </svg>
+      </div>
+      <div>
+        <p class="text-sm font-bold text-gray-800">Sign In Required</p>
+        <p class="text-xs text-gray-500 mt-1">Please sign in or create an account to add items to your cart and place an order.</p>
+      </div>
+      <div class="flex gap-2 pt-1">
+        <button type="button" id="closeSignInRequiredBtn" class="flex-1 py-2.5 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors rounded-[3px]">
+          Maybe Later
+        </button>
+        <a href="auth/login.php" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors rounded-[3px] flex items-center justify-center">
+          Sign In
+        </a>
+      </div>
+    </div>
+  </div>
+
   <script>
     const ALL_MENU_ITEMS = <?php echo json_encode($menuItems); ?>;
 
@@ -400,9 +430,9 @@ $conn->close();
               </div>
               <button type="button" class="w-full mt-2 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium flex items-center justify-center gap-1 transition-all add-btn rounded-[3px]">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.836l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 1.994-4.694 2.602-7.152.126-.51-.26-1.006-.786-1.006H5.106M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
                 </svg>
-                Login to Order
+                Add to Cart
               </button>
             </div>
           </div>
@@ -414,10 +444,25 @@ $conn->close();
         const addBtn = card.querySelector(".add-btn");
         if (addBtn) {
           addBtn.addEventListener("click", function() {
-            window.location.href = "auth/login.php";
+            openSignInRequiredModal();
           });
         }
       });
+    }
+
+    function openSignInRequiredModal() {
+      document.getElementById("signInRequiredModal").classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeSignInRequiredModal() {
+      document.getElementById("signInRequiredModal").classList.add("hidden");
+      document.body.style.overflow = "";
+    }
+
+    function setupSignInRequiredModal() {
+      document.getElementById("closeSignInRequiredBtn").addEventListener("click", closeSignInRequiredModal);
+      document.getElementById("closeSignInRequiredOverlay").addEventListener("click", closeSignInRequiredModal);
     }
 
     function updateLoadMoreVisibility() {
@@ -456,6 +501,8 @@ $conn->close();
     }
 
     function initializeEventListeners() {
+      setupSignInRequiredModal();
+
       const stallFilterBtn = document.getElementById("stallFilterBtn");
       const stallFilterDropdown = document.getElementById("stallFilterDropdown");
 

@@ -169,6 +169,7 @@ function fetchOrdersData($conn, $ownerId)
       'proofImage' => $row['delivery_proof_image'] ? '../' . $row['delivery_proof_image'] : null,
       'deliveryStaff' => $deliveryStaff,
       'deliveryFee' => (float) $row['total_delivery_fee'],
+      'grandTotal' => (float) $row['grand_total'],
       'items' => [],
     ];
   }
@@ -656,22 +657,29 @@ $conn->close();
 
   <div id="acceptOrderModal" class="fixed inset-0 z-[60] hidden flex items-center justify-center px-4">
     <div class="modal-overlay absolute inset-0" id="closeAcceptOrderOverlay"></div>
-    <div class="bg-white w-full max-w-sm relative z-10 shadow-2xl p-5 space-y-4 text-center rounded-md">
-      <div class="w-12 h-12 bg-emerald-50 flex items-center justify-center mx-auto rounded-full">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-emerald-600">
-          <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-        </svg>
+    <div class="bg-white w-full max-w-sm relative z-10 shadow-2xl p-5 rounded-md">
+      <div class="flex items-center gap-2.5 mb-3">
+        <div class="w-8 h-8 bg-emerald-50 flex items-center justify-center shrink-0 rounded-[3px]">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-emerald-600">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+          </svg>
+        </div>
+        <div>
+          <p class="text-sm font-bold text-gray-800">Accept Order</p>
+          <p class="text-[10px] text-gray-400 mt-0.5" id="acceptOrderIdLabel"></p>
+        </div>
       </div>
-      <div>
-        <p class="text-sm font-bold text-gray-800">Accept Order</p>
-        <p class="text-xs text-gray-500 mt-1">Order <span id="acceptOrderIdLabel" class="font-semibold text-gray-700"></span> will move to preparing. Continue?</p>
+      <div class="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-[3px] mb-3">
+        <span class="text-xs text-gray-600" id="acceptOrderSnapshotLeft"></span>
+        <span class="text-xs font-semibold text-gray-800" id="acceptOrderSnapshotTotal"></span>
       </div>
-      <div class="flex gap-2 pt-1">
+      <p class="text-xs text-gray-500 mb-3">This order will move to preparing.</p>
+      <div class="flex gap-2">
         <button id="acceptOrderKeepBtn" class="flex-1 py-2.5 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors rounded-[3px]">
           Cancel
         </button>
         <button id="acceptOrderConfirmBtn" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors rounded-[3px]">
-          Yes, Accept
+          Accept
         </button>
       </div>
     </div>
@@ -679,22 +687,29 @@ $conn->close();
 
   <div id="markReadyModal" class="fixed inset-0 z-[60] hidden flex items-center justify-center px-4">
     <div class="modal-overlay absolute inset-0" id="closeMarkReadyOverlay"></div>
-    <div class="bg-white w-full max-w-sm relative z-10 shadow-2xl p-5 space-y-4 text-center rounded-md">
-      <div class="w-12 h-12 bg-emerald-50 flex items-center justify-center mx-auto rounded-full">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-emerald-600">
-          <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-        </svg>
+    <div class="bg-white w-full max-w-sm relative z-10 shadow-2xl p-5 rounded-md">
+      <div class="flex items-center gap-2.5 mb-3">
+        <div class="w-8 h-8 bg-emerald-50 flex items-center justify-center shrink-0 rounded-[3px]">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-emerald-600">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+          </svg>
+        </div>
+        <div>
+          <p class="text-sm font-bold text-gray-800">Mark as Ready</p>
+          <p class="text-[10px] text-gray-400 mt-0.5" id="markReadyOrderIdLabel"></p>
+        </div>
       </div>
-      <div>
-        <p class="text-sm font-bold text-gray-800">Mark as Ready</p>
-        <p class="text-xs text-gray-500 mt-1">Order <span id="markReadyOrderIdLabel" class="font-semibold text-gray-700"></span> will be marked ready. Continue?</p>
+      <div class="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-[3px] mb-3">
+        <span class="text-xs text-gray-600" id="markReadySnapshotLeft"></span>
+        <span class="text-xs font-semibold text-gray-800" id="markReadySnapshotTotal"></span>
       </div>
-      <div class="flex gap-2 pt-1">
+      <p class="text-xs text-gray-500 mb-3">This order will be marked ready.</p>
+      <div class="flex gap-2">
         <button id="markReadyKeepBtn" class="flex-1 py-2.5 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors rounded-[3px]">
           Cancel
         </button>
         <button id="markReadyConfirmBtn" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors rounded-[3px]">
-          Yes, Mark Ready
+          Mark Ready
         </button>
       </div>
     </div>
@@ -1298,7 +1313,13 @@ $conn->close();
     function openAcceptOrderModal(orderIdRaw) {
       pendingAcceptId = orderIdRaw;
       const order = ALL_ORDERS.find((o) => o.orderIdRaw === orderIdRaw);
-      document.getElementById("acceptOrderIdLabel").textContent = order ? order.id : "";
+      if (!order) return;
+
+      document.getElementById("acceptOrderIdLabel").textContent = order.id;
+      const itemCount = order.items.reduce((sum, item) => sum + item.qty, 0);
+      document.getElementById("acceptOrderSnapshotLeft").textContent = `${order.customerName} · ${itemCount} item${itemCount !== 1 ? "s" : ""}`;
+      document.getElementById("acceptOrderSnapshotTotal").textContent = "₱" + order.grandTotal.toFixed(2);
+
       document.getElementById("acceptOrderModal").classList.remove("hidden");
       document.body.style.overflow = "hidden";
     }
@@ -1312,7 +1333,13 @@ $conn->close();
     function openMarkReadyModal(orderIdRaw) {
       pendingMarkReadyId = orderIdRaw;
       const order = ALL_ORDERS.find((o) => o.orderIdRaw === orderIdRaw);
-      document.getElementById("markReadyOrderIdLabel").textContent = order ? order.id : "";
+      if (!order) return;
+
+      document.getElementById("markReadyOrderIdLabel").textContent = order.id;
+      const itemCount = order.items.reduce((sum, item) => sum + item.qty, 0);
+      document.getElementById("markReadySnapshotLeft").textContent = `${order.customerName} · ${itemCount} item${itemCount !== 1 ? "s" : ""}`;
+      document.getElementById("markReadySnapshotTotal").textContent = "₱" + order.grandTotal.toFixed(2);
+
       document.getElementById("markReadyModal").classList.remove("hidden");
       document.body.style.overflow = "hidden";
     }
