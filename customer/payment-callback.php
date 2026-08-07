@@ -339,6 +339,7 @@ $conn->close();
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Payment Status - NWSSU Food Court</title>
   <link rel="icon" href="../assets/images/nwssu-logo.png" type="image/png" />
+  <link rel="manifest" href="../manifest.json" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@lottiefiles/dotlottie-wc@0.9.4/dist/dotlottie-wc.js" type="module"></script>
   <style>

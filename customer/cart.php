@@ -902,11 +902,20 @@ $conn->close();
                   Order Type
                 </p>
                 <?php if ($isGuestCustomer): ?>
-                <div class="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-[3px]">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500 shrink-0">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016c.896 0 1.7-.393 2.25-1.015a3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19A1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72m-13.5 8.65h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .415.336.75.75.75Z" />
-                  </svg>
-                  <span class="text-[11px] font-semibold text-gray-700">Pickup Order</span>
+                <div class="flex bg-gray-100 p-0.5 gap-0.5 rounded-[3px]">
+                  <button
+                    id="orderTypeDelivery"
+                    disabled
+                    title="Delivery is not available for guest accounts"
+                    class="flex-1 py-1.5 text-[11px] font-semibold transition-all text-gray-300 cursor-not-allowed rounded-[3px]">
+                    Delivery
+                  </button>
+                  <button
+                    id="orderTypePickup"
+                    onclick="setOrderType('pickup')"
+                    class="flex-1 py-1.5 text-[11px] font-semibold transition-all bg-emerald-600 text-white rounded-[3px]">
+                    Pickup
+                  </button>
                 </div>
                 <p class="text-[10px] text-gray-400 mt-1.5 leading-relaxed">
                   Delivery is not available for guest accounts. Please head to the stall to pick up your order.
@@ -1390,8 +1399,8 @@ $conn->close();
   <div
     id="toast"
     class="hidden items-center gap-2 fixed left-1/2 bottom-20 z-40 -translate-x-1/2 max-w-[calc(100%-2rem)] bg-gray-900 text-white text-xs font-medium px-4 py-2.5 shadow-lg rounded-[6px]">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-emerald-400 shrink-0">
-      <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+    <svg id="toastIconSvg" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-emerald-400 shrink-0">
+      <path id="toastIconPath" stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
     </svg>
     <span id="toastMessage" class="truncate"></span>
   </div>
@@ -1443,10 +1452,22 @@ $conn->close();
 
     let toastHideTimeout = null;
 
-    function showToast(message) {
+    function showToast(message, type = "success") {
       const toast = document.getElementById("toast");
       const toastMessage = document.getElementById("toastMessage");
+      const iconSvg = document.getElementById("toastIconSvg");
+      const iconPath = document.getElementById("toastIconPath");
       toastMessage.textContent = message;
+
+      if (type === "warning") {
+        iconSvg.classList.remove("text-emerald-400");
+        iconSvg.classList.add("text-amber-400");
+        iconPath.setAttribute("d", "M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z");
+      } else {
+        iconSvg.classList.remove("text-amber-400");
+        iconSvg.classList.add("text-emerald-400");
+        iconPath.setAttribute("d", "M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z");
+      }
 
       if (toastHideTimeout) clearTimeout(toastHideTimeout);
 
@@ -1982,7 +2003,7 @@ $conn->close();
         .getElementById("checkoutBtn")
         .addEventListener("click", async () => {
           if (globalOrderType === "delivery" && !savedLocation) {
-            alert("Please set a drop-off location first.");
+            showToast("Please set your drop-off location first", "warning");
             return;
           }
           if (cartItems.length === 0) return;

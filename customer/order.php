@@ -524,6 +524,7 @@ $conn->close();
     />
     <title>Customer - My Orders</title>
     <link rel="icon" href="../assets/images/nwssu-logo.png" type="image/png" />
+    <link rel="manifest" href="../manifest.json" />
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
@@ -778,7 +779,7 @@ $conn->close();
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                d="M2.25 3h1.386c.51 0 .955.343 1.087.836l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 1.994-4.694 2.602-7.152.126-.51-.26-1.006-.786-1.006H5.106M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"
+                d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"
               />
             </svg>
             <span class="text-xs font-medium mt-1">Cart</span>
@@ -1630,8 +1631,9 @@ $conn->close();
                 .getElementById("editLocationArea")
                 .classList.add("hidden");
               renderOrders();
+              showToast("Drop-off location updated");
             } else {
-              alert(res.message || "Something went wrong. Please try again.");
+              showToast(res.message || "Something went wrong. Please try again.", "warning");
             }
           });
         }
@@ -1801,14 +1803,16 @@ $conn->close();
             if (res.success) {
               btn.textContent = "Added!";
               if (res.skipped > 0) {
-                alert(`${res.added} item(s) added to cart. ${res.skipped} item(s) are no longer available.`);
+                showToast(`${res.added} item(s) added. ${res.skipped} item(s) are no longer available.`, "warning");
+              } else {
+                showToast("Items added to cart");
               }
               setTimeout(() => {
                 btn.textContent = originalText;
                 btn.disabled = false;
               }, 1500);
             } else {
-              alert(res.message || "Something went wrong. Please try again.");
+              showToast(res.message || "Something went wrong. Please try again.", "warning");
               btn.disabled = false;
             }
           });
@@ -1933,8 +1937,9 @@ $conn->close();
               ALL_ORDERS = res.orders;
               closeCancelModal();
               renderOrders();
+              showToast("Order cancelled");
             } else {
-              alert(res.message || "Something went wrong. Please try again.");
+              showToast(res.message || "Something went wrong. Please try again.", "warning");
             }
           });
       }
@@ -1959,8 +1964,9 @@ $conn->close();
               ALL_ORDERS = res.orders;
               closeConfirmReceiptModal();
               renderOrders();
+              showToast("Order marked as received");
             } else {
-              alert(res.message || "Something went wrong. Please try again.");
+              showToast(res.message || "Something went wrong. Please try again.", "warning");
             }
           });
       }
@@ -1985,10 +1991,41 @@ $conn->close();
               ALL_ORDERS = res.orders;
               closeReportIssueModal();
               renderOrders();
+              showToast("Issue reported successfully");
             } else {
-              alert(res.message || "Something went wrong. Please try again.");
+              showToast(res.message || "Something went wrong. Please try again.", "warning");
             }
           });
+      }
+
+      let toastHideTimeout = null;
+
+      function showToast(message, type = "success") {
+        const toast = document.getElementById("toast");
+        const toastMessage = document.getElementById("toastMessage");
+        const iconSvg = document.getElementById("toastIconSvg");
+        const iconPath = document.getElementById("toastIconPath");
+        toastMessage.textContent = message;
+
+        if (type === "warning") {
+          iconSvg.classList.remove("text-emerald-400");
+          iconSvg.classList.add("text-amber-400");
+          iconPath.setAttribute("d", "M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z");
+        } else {
+          iconSvg.classList.remove("text-amber-400");
+          iconSvg.classList.add("text-emerald-400");
+          iconPath.setAttribute("d", "M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z");
+        }
+
+        if (toastHideTimeout) clearTimeout(toastHideTimeout);
+
+        toast.classList.remove("hidden");
+        toast.classList.add("flex");
+
+        toastHideTimeout = setTimeout(() => {
+          toast.classList.add("hidden");
+          toast.classList.remove("flex");
+        }, 2000);
       }
 
       function init() {
@@ -2007,5 +2044,14 @@ $conn->close();
 
       window.addEventListener("load", init);
     </script>
+
+    <div
+      id="toast"
+      class="hidden items-center gap-2 fixed left-1/2 bottom-20 z-40 -translate-x-1/2 max-w-[calc(100%-2rem)] bg-gray-900 text-white text-xs font-medium px-4 py-2.5 shadow-lg rounded-[6px]">
+      <svg id="toastIconSvg" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-emerald-400 shrink-0">
+        <path id="toastIconPath" stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+      </svg>
+      <span id="toastMessage" class="truncate"></span>
+    </div>
   </body>
 </html>

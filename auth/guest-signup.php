@@ -1151,10 +1151,6 @@ $conn->close();
         termsPrivacyModal.classList.add("hidden");
         document.body.style.overflow = "";
       });
-      document.getElementById("closeTermsPrivacyOverlay").addEventListener("click", () => {
-        termsPrivacyModal.classList.add("hidden");
-        document.body.style.overflow = "";
-      });
 
       const codeModal = document.getElementById("codeModal");
       const codeModalEmail = document.getElementById("codeModalEmail");
@@ -1225,7 +1221,6 @@ $conn->close();
       }
 
       document.getElementById("closeCodeModalBtn").addEventListener("click", closeCodeModal);
-      document.getElementById("closeCodeOverlay").addEventListener("click", closeCodeModal);
 
       codeBoxes.forEach((box, index) => {
         box.addEventListener("input", () => {

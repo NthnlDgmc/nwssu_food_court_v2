@@ -277,6 +277,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 }
 
 $initialProfile = fetchCustomerProfile($conn, $customerId);
+
+$completedOrdersStmt = $conn->prepare("SELECT COUNT(*) AS cnt FROM orders WHERE customer_id = ? AND status IN ('delivered', 'completed')");
+$completedOrdersStmt->bind_param("i", $customerId);
+$completedOrdersStmt->execute();
+$completedOrdersCount = (int) $completedOrdersStmt->get_result()->fetch_assoc()['cnt'];
+$completedOrdersStmt->close();
+
 $conn->close();
 
 if (!$initialProfile) {
@@ -415,7 +422,7 @@ if (!$initialProfile) {
         <div class="grid grid-cols-2 gap-2">
           <div class="rounded-md bg-white border border-gray-200 shadow-sm p-3 text-center">
             <p id="statOrders" class="text-base font-bold text-emerald-600"></p>
-            <p class="text-[10px] text-gray-400 mt-0.5">Total Orders</p>
+            <p class="text-[10px] text-gray-400 mt-0.5">Completed Orders</p>
           </div>
           <div class="rounded-md bg-white border border-gray-200 shadow-sm p-3 text-center">
             <p id="statMemberSince" class="text-base font-bold text-emerald-600"></p>
@@ -968,6 +975,7 @@ if (!$initialProfile) {
       <div class="flex items-center justify-center">
         <div class="p-3 border border-gray-200 rounded-md">
           <img
+            id="shareAppQrImg"
             src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&amp;data=<?php echo urlencode(APP_URL); ?>"
             alt="App QR Code"
             class="w-44 h-44" />
@@ -981,9 +989,14 @@ if (!$initialProfile) {
           </svg>
         </button>
       </div>
-      <button id="closeShareAppBtn" class="w-full py-2.5 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors rounded-[3px]">
+      <div class="flex gap-2">
+        <button id="downloadShareAppQrBtn" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors rounded-[3px] flex items-center justify-center">
+          Download QR
+        </button>
+        <button id="closeShareAppBtn" class="flex-1 py-2.5 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors rounded-[3px]">
         Close
       </button>
+      </div>
     </div>
   </div>
 
@@ -1086,8 +1099,8 @@ if (!$initialProfile) {
   <div
     id="toast"
     class="hidden items-center gap-2 fixed left-1/2 bottom-20 z-40 -translate-x-1/2 max-w-[calc(100%-2rem)] bg-gray-900 text-white text-xs font-medium px-4 py-2.5 shadow-lg rounded-[6px]">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-emerald-400 shrink-0">
-      <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+    <svg id="toastIconSvg" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-emerald-400 shrink-0">
+      <path id="toastIconPath" stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
     </svg>
     <span id="toastMessage" class="truncate"></span>
   </div>
@@ -1102,7 +1115,7 @@ if (!$initialProfile) {
       email: <?php echo json_encode($initialProfile['email']); ?>,
       memberSince: <?php echo json_encode($initialProfile['member_since']); ?>,
       profileImage: <?php echo json_encode($initialProfile['profile_image']); ?>,
-      totalOrders: 0,
+      totalOrders: <?php echo $completedOrdersCount; ?>,
     };
 
 
@@ -1139,10 +1152,22 @@ if (!$initialProfile) {
 
     let toastHideTimeout = null;
 
-    function showToast(message) {
+    function showToast(message, type = "success") {
       const toast = document.getElementById("toast");
       const toastMessage = document.getElementById("toastMessage");
+      const iconSvg = document.getElementById("toastIconSvg");
+      const iconPath = document.getElementById("toastIconPath");
       toastMessage.textContent = message;
+
+      if (type === "warning") {
+        iconSvg.classList.remove("text-emerald-400");
+        iconSvg.classList.add("text-amber-400");
+        iconPath.setAttribute("d", "M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z");
+      } else {
+        iconSvg.classList.remove("text-amber-400");
+        iconSvg.classList.add("text-emerald-400");
+        iconPath.setAttribute("d", "M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z");
+      }
 
       if (toastHideTimeout) clearTimeout(toastHideTimeout);
 
@@ -1226,7 +1251,6 @@ if (!$initialProfile) {
 
       document.getElementById("notificationsBtn").addEventListener("click", openNotificationsModal);
       document.getElementById("closeNotificationsBtn").addEventListener("click", closeNotificationsModal);
-      document.getElementById("closeNotificationsOverlay").addEventListener("click", closeNotificationsModal);
 
       if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
         toggle.disabled = true;
@@ -1706,7 +1730,6 @@ if (!$initialProfile) {
     function setupEditProfileModal() {
       document.getElementById("editProfileBtn").addEventListener("click", openEditProfileModal);
       document.getElementById("closeEditProfileBtn").addEventListener("click", closeEditProfileModal);
-      document.getElementById("closeEditProfileOverlay").addEventListener("click", closeEditProfileModal);
       document.getElementById("cancelEditProfileBtn").addEventListener("click", closeEditProfileModal);
       document.getElementById("saveEditProfileBtn").addEventListener("click", saveEditProfile);
 
@@ -1781,7 +1804,6 @@ if (!$initialProfile) {
     function setupChangePasswordModal() {
       document.getElementById("changePasswordBtn").addEventListener("click", openChangePasswordModal);
       document.getElementById("closeChangePasswordBtn").addEventListener("click", closeChangePasswordModal);
-      document.getElementById("closeChangePasswordOverlay").addEventListener("click", closeChangePasswordModal);
       document.getElementById("cancelChangePasswordBtn").addEventListener("click", closeChangePasswordModal);
       document.getElementById("saveChangePasswordBtn").addEventListener("click", saveChangePassword);
 
@@ -1835,7 +1857,6 @@ if (!$initialProfile) {
       };
       document.getElementById("termsPrivacyBtn").addEventListener("click", openModal);
       document.getElementById("closeTermsPrivacyBtn").addEventListener("click", closeModal);
-      document.getElementById("closeTermsPrivacyOverlay").addEventListener("click", closeModal);
     }
 
     function setupShareAppModal() {
@@ -1850,7 +1871,6 @@ if (!$initialProfile) {
       };
       document.getElementById("shareAppBtn").addEventListener("click", openModal);
       document.getElementById("closeShareAppBtn").addEventListener("click", closeModal);
-      document.getElementById("closeShareAppOverlay").addEventListener("click", closeModal);
 
       document.getElementById("copyShareAppUrlBtn").addEventListener("click", async () => {
         const url = document.getElementById("shareAppUrlText").textContent;
@@ -1858,14 +1878,31 @@ if (!$initialProfile) {
           await navigator.clipboard.writeText(url);
           showToast("Link copied to clipboard");
         } catch (err) {
-          showToast("Failed to copy link");
+          showToast("Failed to copy link", "warning");
+        }
+      });
+
+      document.getElementById("downloadShareAppQrBtn").addEventListener("click", async () => {
+        const img = document.getElementById("shareAppQrImg");
+        try {
+          const response = await fetch(img.src);
+          const blob = await response.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = blobUrl;
+          a.download = "nwssu-foodcourt-qr.png";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(blobUrl);
+        } catch (err) {
+          window.open(img.src, "_blank");
         }
       });
     }
 
     function setupLogoutModal() {
       document.getElementById("logoutBtn").addEventListener("click", openLogoutModal);
-      document.getElementById("closeLogoutOverlay").addEventListener("click", closeLogoutModal);
       document.getElementById("cancelLogoutBtn").addEventListener("click", closeLogoutModal);
       document.getElementById("confirmLogoutBtn").addEventListener("click", () => {
         window.location.href = "../auth/logout.php";
@@ -1874,7 +1911,6 @@ if (!$initialProfile) {
 
     function setupDeleteAccountModal() {
       document.getElementById("deleteAccountBtn").addEventListener("click", openDeleteAccountModal);
-      document.getElementById("closeDeleteAccountOverlay").addEventListener("click", closeDeleteAccountModal);
       document.getElementById("cancelDeleteAccountBtn").addEventListener("click", closeDeleteAccountModal);
       document.getElementById("confirmDeleteAccountBtn").addEventListener("click", confirmDeleteAccount);
       makePasswordToggle("toggleDeleteAccountPasswordBtn", "deleteAccountPassword", "deleteAccountPwEyeIcon");

@@ -3,6 +3,7 @@ session_start();
 require_once '../config/database.php';
 require_once '../config/vapid.php';
 require_once '../config/version.php';
+require_once '../config/app-url.php';
 
 if (!isset($_SESSION['staff_id'])) {
   header('Location: ../auth/login.php');
@@ -10,6 +11,22 @@ if (!isset($_SESSION['staff_id'])) {
 }
 
 $staffId = $_SESSION['staff_id'];
+
+function toTitleCase($str)
+{
+  $str = preg_replace('/\s+/', ' ', trim($str));
+  if ($str === '') {
+    return '';
+  }
+  $str = mb_strtolower($str, 'UTF-8');
+  return preg_replace_callback(
+    "/(^|[\s'\-])(\p{L})/u",
+    function ($m) {
+      return $m[1] . mb_strtoupper($m[2], 'UTF-8');
+    },
+    $str
+  );
+}
 
 function fetchStaffProfile($conn, $staffId)
 {
@@ -64,9 +81,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
   $action = $_POST['action'];
 
   if ($action === 'edit_profile') {
-    $firstName = trim($_POST['first_name'] ?? '');
-    $lastName = trim($_POST['last_name'] ?? '');
-    $contact = preg_replace('/\D/', '', $_POST['contact_number'] ?? '');
+    $firstName = toTitleCase(trim($_POST['first_name'] ?? ''));
+    $lastName = toTitleCase(trim($_POST['last_name'] ?? ''));
+    $contact = trim($_POST['contact_number'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $removeImage = ($_POST['remove_image'] ?? '') === '1';
 
@@ -74,12 +91,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       echo json_encode(['success' => false, 'message' => 'First name is required.']);
       exit;
     }
+    if (!preg_match("/^[\p{L}\s'\-]+$/u", $firstName)) {
+      echo json_encode(['success' => false, 'message' => 'First name can only contain letters.']);
+      exit;
+    }
     if ($lastName === '') {
       echo json_encode(['success' => false, 'message' => 'Last name is required.']);
       exit;
     }
-    if (strlen($contact) !== 10 || $contact[0] !== '9') {
-      echo json_encode(['success' => false, 'message' => 'Please enter a valid 10-digit contact number starting with 9.']);
+    if (!preg_match("/^[\p{L}\s'\-]+$/u", $lastName)) {
+      echo json_encode(['success' => false, 'message' => 'Last name can only contain letters.']);
+      exit;
+    }
+    if ($contact === '') {
+      echo json_encode(['success' => false, 'message' => 'Please enter a contact number.']);
       exit;
     }
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -87,10 +112,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
 
-    $fullContact = '+63' . $contact;
-
     $stmt = $conn->prepare("UPDATE delivery_staff SET first_name = ?, last_name = ?, contact_number = ?, email = ? WHERE staff_id = ?");
-    $stmt->bind_param("ssssi", $firstName, $lastName, $fullContact, $email, $staffId);
+    $stmt->bind_param("ssssi", $firstName, $lastName, $contact, $email, $staffId);
     $ok = $stmt->execute();
     $stmt->close();
 
@@ -246,17 +269,6 @@ if (!$initialProfile) {
     input.error {
       border-color: #f87171;
     }
-
-    #toast {
-      opacity: 0;
-      transform: translate(-50%, 8px);
-      transition: opacity 0.25s ease, transform 0.25s ease;
-    }
-
-    #toast.toast-visible {
-      opacity: 1;
-      transform: translate(-50%, 0);
-    }
   </style>
 </head>
 
@@ -291,7 +303,14 @@ if (!$initialProfile) {
     <div class="flex-1 overflow-y-auto mt-12 mb-16" id="mainContent">
       <div class="max-w-5xl mx-auto px-4 pt-3 pb-4 space-y-3">
         <div class="rounded-md bg-white border border-gray-200 shadow-sm p-4">
-          <div class="flex items-center gap-3">
+          <div id="profileSkeleton" class="flex items-center gap-3 animate-pulse">
+            <div class="w-16 h-16 bg-gray-200 shrink-0 rounded-full"></div>
+            <div class="flex-1 min-w-0 space-y-2">
+              <div class="h-4 bg-gray-200 rounded w-32"></div>
+              <div class="h-3 bg-gray-200 rounded w-40"></div>
+            </div>
+          </div>
+          <div id="profileContent" class="hidden items-center gap-3">
             <div
               id="profileAvatar"
               class="w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-white font-bold text-xl shrink-0 rounded-full overflow-hidden"></div>
@@ -377,14 +396,14 @@ if (!$initialProfile) {
           </div>
           <div class="divide-y divide-gray-100">
             <button
-              class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
-              data-info="For assistance, please message the NWSSU Food Court support team via the Chats tab.">
+              id="shareAppBtn"
+              class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">
               <span class="w-8 h-8 bg-gray-100 flex items-center justify-center shrink-0 rounded-[3px]">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
                 </svg>
               </span>
-              <span class="flex-1 text-xs font-medium text-gray-700">Help Center</span>
+              <span class="flex-1 text-xs font-medium text-gray-700">Share App</span>
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-300 shrink-0">
                 <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
               </svg>
@@ -542,11 +561,11 @@ if (!$initialProfile) {
 
         <div
           id="editProfileError"
-          class="hidden flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-[3px]">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-red-500 shrink-0 mt-0.5">
+          class="hidden flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-[3px]">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-red-500 shrink-0">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
           </svg>
-          <p class="text-[10px] text-red-600 font-medium" id="editProfileErrorMsg"></p>
+          <p class="text-[10px] text-red-600 font-medium leading-none" id="editProfileErrorMsg"></p>
         </div>
 
         <div class="grid grid-cols-2 gap-3">
@@ -562,10 +581,7 @@ if (!$initialProfile) {
 
         <div>
           <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Contact Number</label>
-          <div class="relative">
-            <div class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium pointer-events-none">+63</div>
-            <input type="tel" id="fieldContact" maxlength="10" placeholder="9XX XXX XXXX" class="w-full pl-10 pr-3 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600 rounded-[3px]" />
-          </div>
+          <input type="tel" id="fieldContact" placeholder="0917 123 4567" class="w-full px-3 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600 rounded-[3px]" />
         </div>
 
         <div>
@@ -577,7 +593,7 @@ if (!$initialProfile) {
         <button id="cancelEditProfileBtn" class="flex-1 py-2.5 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors rounded-[3px]">
           Cancel
         </button>
-        <button id="saveEditProfileBtn" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors rounded-[3px]">
+        <button id="saveEditProfileBtn" disabled class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-70 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors rounded-[3px]">
           Save Changes
         </button>
       </div>
@@ -601,17 +617,22 @@ if (!$initialProfile) {
       <div class="p-4 space-y-3">
         <div
           id="passwordError"
-          class="hidden flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-[3px]">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-red-500 shrink-0 mt-0.5">
+          class="hidden flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-[3px]">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-red-500 shrink-0">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
           </svg>
-          <p class="text-[10px] text-red-600 font-medium" id="passwordErrorMsg"></p>
+          <p class="text-[10px] text-red-600 font-medium leading-none" id="passwordErrorMsg"></p>
         </div>
 
         <div>
           <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Current Password</label>
           <div class="relative">
-            <input type="password" id="fieldCurrentPassword" placeholder="Enter current password" class="w-full px-3 py-2.5 pr-9 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600 rounded-[3px]" />
+            <div class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+              </svg>
+            </div>
+            <input type="password" id="fieldCurrentPassword" placeholder="Enter current password" class="w-full pl-9 pr-9 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600 rounded-[3px]" />
             <button
               type="button"
               id="toggleCurrentPasswordBtn"
@@ -640,7 +661,12 @@ if (!$initialProfile) {
         <div>
           <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">New Password</label>
           <div class="relative">
-            <input type="password" id="fieldNewPassword" placeholder="At least 8 characters" class="w-full px-3 py-2.5 pr-9 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600 rounded-[3px]" />
+            <div class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+              </svg>
+            </div>
+            <input type="password" id="fieldNewPassword" placeholder="At least 8 characters" class="w-full pl-9 pr-9 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600 rounded-[3px]" />
             <button
               type="button"
               id="toggleNewPasswordBtn"
@@ -678,7 +704,12 @@ if (!$initialProfile) {
         <div>
           <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Confirm New Password</label>
           <div class="relative">
-            <input type="password" id="fieldConfirmPassword" placeholder="Repeat new password" class="w-full px-3 py-2.5 pr-9 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600 rounded-[3px]" />
+            <div class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+              </svg>
+            </div>
+            <input type="password" id="fieldConfirmPassword" placeholder="Repeat new password" class="w-full pl-9 pr-9 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600 rounded-[3px]" />
             <button
               type="button"
               id="toggleConfirmPasswordBtn"
@@ -743,6 +774,38 @@ if (!$initialProfile) {
           </label>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div
+    id="shareAppModal"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center px-4">
+    <div class="modal-overlay absolute inset-0" id="closeShareAppOverlay"></div>
+    <div
+      class="bg-white w-full max-w-sm relative z-10 shadow-2xl p-5 space-y-4 text-center rounded-md">
+      <div>
+        <p class="text-sm font-bold text-gray-800">Share NWSSU Food Court</p>
+        <p class="text-xs text-gray-500 mt-1">Let a friend scan this code to open the app.</p>
+      </div>
+      <div class="flex items-center justify-center">
+        <div class="p-3 border border-gray-200 rounded-md">
+          <img
+            src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&amp;data=<?php echo urlencode(APP_URL); ?>"
+            alt="App QR Code"
+            class="w-44 h-44" />
+        </div>
+      </div>
+      <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 px-3 py-2.5 rounded-[3px]">
+        <p id="shareAppUrlText" class="flex-1 text-xs text-gray-600 truncate text-left"><?php echo htmlspecialchars(APP_URL); ?></p>
+        <button id="copyShareAppUrlBtn" class="shrink-0 p-1 hover:bg-gray-200 transition-colors rounded-[3px]">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" />
+          </svg>
+        </button>
+      </div>
+      <button id="closeShareAppBtn" class="w-full py-2.5 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors rounded-[3px]">
+        Close
+      </button>
     </div>
   </div>
 
@@ -929,7 +992,6 @@ if (!$initialProfile) {
     }
 
     let toastHideTimeout = null;
-    let toastRemoveTimeout = null;
 
     function showToast(message) {
       const toast = document.getElementById("toast");
@@ -937,23 +999,13 @@ if (!$initialProfile) {
       toastMessage.textContent = message;
 
       if (toastHideTimeout) clearTimeout(toastHideTimeout);
-      if (toastRemoveTimeout) clearTimeout(toastRemoveTimeout);
 
       toast.classList.remove("hidden");
       toast.classList.add("flex");
 
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          toast.classList.add("toast-visible");
-        });
-      });
-
       toastHideTimeout = setTimeout(() => {
-        toast.classList.remove("toast-visible");
-        toastRemoveTimeout = setTimeout(() => {
-          toast.classList.add("hidden");
-          toast.classList.remove("flex");
-        }, 250);
+        toast.classList.add("hidden");
+        toast.classList.remove("flex");
       }, 2000);
     }
 
@@ -1114,6 +1166,10 @@ if (!$initialProfile) {
 
       document.getElementById("statDeliveries").textContent = deliveryAccount.totalDeliveries;
       document.getElementById("statMemberSince").textContent = deliveryAccount.memberSince;
+
+      document.getElementById("profileSkeleton").classList.add("hidden");
+      document.getElementById("profileContent").classList.remove("hidden");
+      document.getElementById("profileContent").classList.add("flex");
     }
 
     function updateEditProfilePreview(src, initials) {
@@ -1134,6 +1190,20 @@ if (!$initialProfile) {
       }
     }
 
+    let initialEditProfileState = {};
+
+    function checkForEditProfileChanges() {
+      const changed =
+        document.getElementById("fieldFirstName").value !== initialEditProfileState.firstName ||
+        document.getElementById("fieldLastName").value !== initialEditProfileState.lastName ||
+        document.getElementById("fieldContact").value !== initialEditProfileState.contact ||
+        document.getElementById("fieldEmail").value !== initialEditProfileState.email ||
+        currentProfileImageFile !== null ||
+        removeImageFlag;
+
+      document.getElementById("saveEditProfileBtn").disabled = !changed;
+    }
+
     function openEditProfileModal() {
       document.getElementById("fieldFirstName").value = deliveryAccount.firstName;
       document.getElementById("fieldLastName").value = deliveryAccount.lastName;
@@ -1150,6 +1220,13 @@ if (!$initialProfile) {
         deliveryAccount.profileImage || null,
         getInitials(deliveryAccount.firstName, deliveryAccount.lastName),
       );
+      initialEditProfileState = {
+        firstName: deliveryAccount.firstName,
+        lastName: deliveryAccount.lastName,
+        contact: deliveryAccount.contactNumber,
+        email: deliveryAccount.email,
+      };
+      document.getElementById("saveEditProfileBtn").disabled = true;
       document.getElementById("editProfileModal").classList.remove("hidden");
       document.body.style.overflow = "hidden";
     }
@@ -1164,6 +1241,18 @@ if (!$initialProfile) {
       document.getElementById("editProfileError").classList.remove("hidden");
     }
 
+    function toTitleCase(str) {
+      return str
+        .trim()
+        .replace(/\s+/g, " ")
+        .toLowerCase()
+        .replace(/(^|[\s'-])\p{L}/gu, (c) => c.toUpperCase());
+    }
+
+    function isValidName(val) {
+      return /^[\p{L}\s'-]+$/u.test(val);
+    }
+
     function isValidEmail(val) {
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
     }
@@ -1171,7 +1260,7 @@ if (!$initialProfile) {
     async function saveEditProfile() {
       const firstName = document.getElementById("fieldFirstName").value.trim();
       const lastName = document.getElementById("fieldLastName").value.trim();
-      const contact = document.getElementById("fieldContact").value.replace(/\D/g, "").slice(0, 10);
+      const contact = document.getElementById("fieldContact").value.trim();
       const email = document.getElementById("fieldEmail").value.trim();
 
       document
@@ -1184,13 +1273,23 @@ if (!$initialProfile) {
         document.getElementById("fieldFirstName").classList.add("error");
         return;
       }
+      if (!isValidName(firstName)) {
+        showEditProfileError("First name can only contain letters.");
+        document.getElementById("fieldFirstName").classList.add("error");
+        return;
+      }
       if (!lastName) {
         showEditProfileError("Last name is required.");
         document.getElementById("fieldLastName").classList.add("error");
         return;
       }
-      if (!contact || contact.length < 10 || !contact.startsWith("9")) {
-        showEditProfileError("Please enter a valid 10-digit contact number starting with 9.");
+      if (!isValidName(lastName)) {
+        showEditProfileError("Last name can only contain letters.");
+        document.getElementById("fieldLastName").classList.add("error");
+        return;
+      }
+      if (!contact) {
+        showEditProfileError("Please enter a contact number.");
         document.getElementById("fieldContact").classList.add("error");
         return;
       }
@@ -1247,6 +1346,7 @@ if (!$initialProfile) {
 
       renderProfile();
       closeEditProfileModal();
+      showToast("Profile updated successfully");
     }
 
     function resetPasswordModal() {
@@ -1405,6 +1505,7 @@ if (!$initialProfile) {
         const reader = new FileReader();
         reader.onload = (ev) => {
           updateEditProfilePreview(ev.target.result, null);
+          checkForEditProfileChanges();
         };
         reader.readAsDataURL(file);
       });
@@ -1415,6 +1516,49 @@ if (!$initialProfile) {
         const first = document.getElementById("fieldFirstName").value.trim();
         const last = document.getElementById("fieldLastName").value.trim();
         updateEditProfilePreview(null, getInitials(first || "?", last || ""));
+        checkForEditProfileChanges();
+      });
+
+      ["fieldFirstName", "fieldLastName", "fieldContact", "fieldEmail"].forEach((id) => {
+        document.getElementById(id).addEventListener("input", checkForEditProfileChanges);
+      });
+
+      [document.getElementById("fieldFirstName"), document.getElementById("fieldLastName")].forEach((el) => {
+        el.addEventListener("input", () => {
+          const cursorPos = el.selectionStart;
+          const cleaned = el.value.replace(/[^\p{L}\s'-]/gu, "");
+          if (cleaned !== el.value) {
+            const removedCount = el.value.length - cleaned.length;
+            el.value = cleaned;
+            const newPos = Math.max(0, cursorPos - removedCount);
+            el.setSelectionRange(newPos, newPos);
+          }
+        });
+
+        el.addEventListener("blur", () => {
+          if (el.value.trim()) {
+            el.value = toTitleCase(el.value);
+            checkForEditProfileChanges();
+          }
+        });
+      });
+
+      document.getElementById("fieldEmail").addEventListener("input", (e) => {
+        const cursorPos = e.target.selectionStart;
+        const cleaned = e.target.value.replace(/\s/g, "");
+        if (cleaned !== e.target.value) {
+          const removedCount = e.target.value.length - cleaned.length;
+          e.target.value = cleaned;
+          const newPos = Math.max(0, cursorPos - removedCount);
+          e.target.setSelectionRange(newPos, newPos);
+        }
+      });
+
+      document.getElementById("fieldEmail").addEventListener("blur", (e) => {
+        if (e.target.value.trim()) {
+          e.target.value = e.target.value.trim().toLowerCase();
+          checkForEditProfileChanges();
+        }
       });
     }
 
@@ -1466,6 +1610,31 @@ if (!$initialProfile) {
       document.getElementById("closeTermsPrivacyOverlay").addEventListener("click", closeModal);
     }
 
+    function setupShareAppModal() {
+      const modal = document.getElementById("shareAppModal");
+      const openModal = () => {
+        modal.classList.remove("hidden");
+        document.body.style.overflow = "hidden";
+      };
+      const closeModal = () => {
+        modal.classList.add("hidden");
+        document.body.style.overflow = "";
+      };
+      document.getElementById("shareAppBtn").addEventListener("click", openModal);
+      document.getElementById("closeShareAppBtn").addEventListener("click", closeModal);
+      document.getElementById("closeShareAppOverlay").addEventListener("click", closeModal);
+
+      document.getElementById("copyShareAppUrlBtn").addEventListener("click", async () => {
+        const url = document.getElementById("shareAppUrlText").textContent;
+        try {
+          await navigator.clipboard.writeText(url);
+          showToast("Link copied to clipboard");
+        } catch (err) {
+          showToast("Failed to copy link");
+        }
+      });
+    }
+
     function setupLogoutModal() {
       document.getElementById("logoutBtn").addEventListener("click", openLogoutModal);
       document.getElementById("closeLogoutOverlay").addEventListener("click", closeLogoutModal);
@@ -1482,6 +1651,7 @@ if (!$initialProfile) {
       setupChangePasswordModal();
       setupInfoRows();
       setupTermsPrivacyModal();
+      setupShareAppModal();
       setupLogoutModal();
       setupNotificationToggle();
     }

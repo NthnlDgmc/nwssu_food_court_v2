@@ -35,6 +35,16 @@ function getAdminInitials($first, $last)
 
 $adminInitials = getAdminInitials($adminFirstName, $adminLastName);
 
+if (($_GET['action'] ?? '') === 'download_template') {
+  header('Content-Type: text/csv');
+  header('Content-Disposition: attachment; filename="customer_bulk_upload_template.csv"');
+  $output = fopen('php://output', 'w');
+  fputcsv($output, ['customer_type', 'student_id', 'first_name', 'last_name', 'password']);
+  fputcsv($output, ['student', '2026-12345', 'Juan', 'Dela Cruz', '-Password123']);
+  fclose($output);
+  exit;
+}
+
 $ALLOWED_CUSTOMER_TYPES = ['student', 'faculty', 'staff', 'guest'];
 
 function fetchCustomersData($conn)
@@ -280,6 +290,170 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     echo json_encode($ok
       ? ['success' => true]
       : ['success' => false, 'message' => 'Failed to add customer.']);
+    $conn->close();
+    exit;
+  }
+
+  if ($action === 'bulk_import_customers') {
+    if (!isset($_FILES['csv_file']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
+      echo json_encode(['success' => false, 'message' => 'Please upload a valid CSV file.']);
+      $conn->close();
+      exit;
+    }
+
+    $fileTmpPath = $_FILES['csv_file']['tmp_name'];
+    $fileName = $_FILES['csv_file']['name'];
+
+    if (strtolower(pathinfo($fileName, PATHINFO_EXTENSION)) !== 'csv') {
+      echo json_encode(['success' => false, 'message' => 'Please upload a CSV file.']);
+      $conn->close();
+      exit;
+    }
+
+    if ($_FILES['csv_file']['size'] > 10 * 1024 * 1024) {
+      echo json_encode(['success' => false, 'message' => 'File size exceeds the 10MB limit.']);
+      $conn->close();
+      exit;
+    }
+
+    $handle = fopen($fileTmpPath, 'r');
+    if (!$handle) {
+      echo json_encode(['success' => false, 'message' => 'Could not read the uploaded file.']);
+      $conn->close();
+      exit;
+    }
+
+    $header = fgetcsv($handle);
+    if (!$header) {
+      echo json_encode(['success' => false, 'message' => 'The CSV file is empty.']);
+      fclose($handle);
+      $conn->close();
+      exit;
+    }
+
+    $header = array_map(function ($h) {
+      return strtolower(trim($h));
+    }, $header);
+
+    $requiredCols = ['customer_type', 'student_id', 'first_name', 'last_name', 'password'];
+    $missingCols = array_diff($requiredCols, $header);
+    if (!empty($missingCols)) {
+      echo json_encode(['success' => false, 'message' => 'Missing required columns: ' . implode(', ', $missingCols)]);
+      fclose($handle);
+      $conn->close();
+      exit;
+    }
+
+    $colIndex = array_flip($header);
+
+    $successCount = 0;
+    $failCount = 0;
+    $errors = [];
+    $rowNum = 1;
+
+    while (($row = fgetcsv($handle)) !== false) {
+      $rowNum++;
+
+      $hasContent = count(array_filter($row, function ($v) {
+        return trim((string) $v) !== '';
+      })) > 0;
+      if (!$hasContent) {
+        continue;
+      }
+
+      $custType = strtolower(trim($row[$colIndex['customer_type']] ?? ''));
+      $idNumber = trim($row[$colIndex['student_id']] ?? '');
+      $firstName = toTitleCase(trim($row[$colIndex['first_name']] ?? ''));
+      $lastName = toTitleCase(trim($row[$colIndex['last_name']] ?? ''));
+      $password = trim($row[$colIndex['password']] ?? '');
+
+      if (!in_array($custType, $ALLOWED_CUSTOMER_TYPES, true)) {
+        $failCount++;
+        $errors[] = "Row {$rowNum}: Invalid customer type \"{$custType}\".";
+        continue;
+      }
+
+      if ($firstName === '') {
+        $failCount++;
+        $errors[] = "Row {$rowNum}: First name is required.";
+        continue;
+      }
+
+      if (!preg_match("/^[\p{L}\s'\-]+$/u", $firstName)) {
+        $failCount++;
+        $errors[] = "Row {$rowNum}: First name can only contain letters.";
+        continue;
+      }
+
+      if ($lastName === '') {
+        $failCount++;
+        $errors[] = "Row {$rowNum}: Last name is required.";
+        continue;
+      }
+
+      if (!preg_match("/^[\p{L}\s'\-]+$/u", $lastName)) {
+        $failCount++;
+        $errors[] = "Row {$rowNum}: Last name can only contain letters.";
+        continue;
+      }
+
+      if ($custType !== 'guest') {
+        if ($idNumber === '') {
+          $failCount++;
+          $errors[] = "Row {$rowNum}: Student ID is required.";
+          continue;
+        }
+        if (!preg_match('/^[0-9-]+$/', $idNumber)) {
+          $failCount++;
+          $errors[] = "Row {$rowNum}: Student ID can only contain numbers and hyphens.";
+          continue;
+        }
+        if (idNumberTakenByOther($conn, $idNumber)) {
+          $failCount++;
+          $errors[] = "Row {$rowNum}: Student ID \"{$idNumber}\" is already registered.";
+          continue;
+        }
+      } else {
+        $idNumber = '';
+      }
+
+      if ($password === '') {
+        $failCount++;
+        $errors[] = "Row {$rowNum}: Password is required.";
+        continue;
+      }
+
+      if (!isStrongPassword($password)) {
+        $failCount++;
+        $errors[] = "Row {$rowNum}: Password must be at least 8 characters and include an uppercase letter, a number, and a symbol.";
+        continue;
+      }
+
+      $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+      $idNumberToSave = $idNumber !== '' ? $idNumber : null;
+      $emptyContact = '';
+
+      $stmt = $conn->prepare("INSERT INTO customers (id_number, first_name, last_name, contact_number, password, customer_type, status) VALUES (?, ?, ?, ?, ?, ?, 'active')");
+      $stmt->bind_param("ssssss", $idNumberToSave, $firstName, $lastName, $emptyContact, $hashedPassword, $custType);
+      $ok = $stmt->execute();
+      $stmt->close();
+
+      if ($ok) {
+        $successCount++;
+      } else {
+        $failCount++;
+        $errors[] = "Row {$rowNum}: Failed to save to database.";
+      }
+    }
+
+    fclose($handle);
+
+    echo json_encode([
+      'success' => true,
+      'success_count' => $successCount,
+      'fail_count' => $failCount,
+      'errors' => array_slice($errors, 0, 20),
+    ]);
     $conn->close();
     exit;
   }
@@ -641,6 +815,7 @@ $conn->close();
       </div>
 
       <nav class="flex-1 overflow-y-auto py-3 px-3 space-y-1">
+
         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 pt-1 pb-1.5">Main</p>
 
         <a href="./dashboard.php" class="sidebar-link flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent font-medium transition-colors" style="border-radius:6px">
@@ -717,6 +892,7 @@ $conn->close();
           </span>
           <span class="text-sm">My Account</span>
         </a>
+
       </nav>
     </aside>
 
@@ -828,6 +1004,14 @@ $conn->close();
               All Customers
               <span class="text-gray-400 font-normal" id="customerCount"></span>
             </p>
+            <button
+              id="bulkUploadBtn"
+              class="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 hover:border-emerald-500 hover:bg-slate-50 transition-all text-xs font-semibold text-gray-700 shrink-0 rounded-[3px]">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
+              </svg>
+              Bulk Upload
+            </button>
           </div>
           <div id="customerList" class="divide-y divide-gray-100"></div>
           <div id="emptyState" class="hidden py-12 text-center">
@@ -849,6 +1033,65 @@ $conn->close();
             </p>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    id="bulkUploadModal"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center px-4">
+    <div class="modal-overlay absolute inset-0" id="closeBulkUploadOverlay"></div>
+    <div class="bg-white w-full max-w-md relative z-10 shadow-2xl rounded-md">
+      <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+        <h2 class="font-bold text-gray-800 text-sm">Bulk Upload Customers</h2>
+        <button id="closeBulkUploadBtn" class="p-1 hover:bg-gray-100 rounded-[3px]">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div class="p-4 space-y-3">
+        <div
+          id="bulkUploadError"
+          class="hidden flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-[3px]">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-red-500 shrink-0">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+          </svg>
+          <p class="text-[10px] text-red-600 font-medium leading-none" id="bulkUploadErrorMsg"></p>
+        </div>
+
+        <div id="bulkUploadResult" class="hidden p-3 bg-emerald-50 border border-emerald-200 rounded-[3px]">
+          <p class="text-xs font-semibold text-emerald-700" id="bulkUploadResultSummary"></p>
+          <ul id="bulkUploadResultErrors" class="mt-1.5 space-y-0.5 text-[10px] text-red-600 list-disc list-inside"></ul>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Upload File</label>
+          <button type="button" id="downloadTemplateBtn" class="text-[11px] font-semibold text-emerald-600 hover:text-emerald-700">
+            Download Template
+          </button>
+        </div>
+
+        <div
+          id="dropZone"
+          class="border-2 border-dashed border-gray-300 hover:border-emerald-400 transition-colors p-6 flex flex-col items-center justify-center cursor-pointer rounded-[3px]">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-gray-400">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
+          </svg>
+          <p class="text-xs font-medium text-gray-600 mt-2">Click to upload or drag and drop</p>
+          <p class="text-[10px] text-gray-400 mt-1" id="bulkUploadFileName">No file selected</p>
+          <input type="file" id="bulkUploadFileInput" accept=".csv" class="hidden" />
+        </div>
+
+        <p class="text-[10px] text-gray-400">Max file size: 10MB &middot; CSV format only</p>
+      </div>
+      <div class="px-4 pb-4 flex gap-2">
+        <button id="cancelBulkUploadBtn" class="flex-1 py-2.5 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors rounded-[3px]">
+          Cancel
+        </button>
+        <button id="submitBulkUploadBtn" disabled class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-70 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors rounded-[3px]">
+          Upload
+        </button>
       </div>
     </div>
   </div>
@@ -1671,6 +1914,151 @@ $conn->close();
       selectEl.style.width = (textWidth + 38) + "px";
     }
 
+    let bulkUploadFile = null;
+
+    function openBulkUploadModal() {
+      bulkUploadFile = null;
+      document.getElementById("bulkUploadFileInput").value = "";
+      document.getElementById("bulkUploadFileName").textContent = "No file selected";
+      document.getElementById("bulkUploadError").classList.add("hidden");
+      document.getElementById("bulkUploadResult").classList.add("hidden");
+      document.getElementById("submitBulkUploadBtn").disabled = true;
+      document.getElementById("bulkUploadModal").classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeBulkUploadModal() {
+      document.getElementById("bulkUploadModal").classList.add("hidden");
+      document.body.style.overflow = "";
+    }
+
+    function showBulkUploadError(msg) {
+      document.getElementById("bulkUploadErrorMsg").textContent = msg;
+      const errEl = document.getElementById("bulkUploadError");
+      errEl.classList.remove("hidden");
+      errEl.classList.add("flex");
+    }
+
+    function handleBulkUploadFile(file) {
+      document.getElementById("bulkUploadError").classList.add("hidden");
+      document.getElementById("bulkUploadResult").classList.add("hidden");
+
+      if (!file) return;
+
+      const isCsv = file.name.toLowerCase().endsWith(".csv");
+      if (!isCsv) {
+        showBulkUploadError("Please select a CSV file.");
+        return;
+      }
+
+      const maxSize = 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        showBulkUploadError("File size exceeds the 10MB limit.");
+        return;
+      }
+
+      bulkUploadFile = file;
+      document.getElementById("bulkUploadFileName").textContent = file.name;
+      document.getElementById("submitBulkUploadBtn").disabled = false;
+    }
+
+    async function submitBulkUpload() {
+      if (!bulkUploadFile) return;
+
+      const submitBtn = document.getElementById("submitBulkUploadBtn");
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Uploading...";
+      document.getElementById("bulkUploadError").classList.add("hidden");
+      document.getElementById("bulkUploadResult").classList.add("hidden");
+
+      const formData = new FormData();
+      formData.append("action", "bulk_import_customers");
+      formData.append("csv_file", bulkUploadFile);
+
+      try {
+        const response = await fetch("customers.php", {
+          method: "POST",
+          body: formData,
+        });
+        const res = await response.json();
+
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Upload";
+
+        if (!res.success) {
+          showBulkUploadError(res.message || "Something went wrong. Please try again.");
+          return;
+        }
+
+        const resultEl = document.getElementById("bulkUploadResult");
+        const summaryEl = document.getElementById("bulkUploadResultSummary");
+        const errorsEl = document.getElementById("bulkUploadResultErrors");
+
+        summaryEl.textContent = res.success_count + " customer(s) added successfully. " + res.fail_count + " failed.";
+        errorsEl.innerHTML = "";
+        if (res.errors && res.errors.length > 0) {
+          res.errors.forEach((err) => {
+            const li = document.createElement("li");
+            li.textContent = err;
+            errorsEl.appendChild(li);
+          });
+        }
+        resultEl.classList.remove("hidden");
+
+        document.getElementById("bulkUploadFileInput").value = "";
+        bulkUploadFile = null;
+        document.getElementById("bulkUploadFileName").textContent = "No file selected";
+        submitBtn.disabled = true;
+
+        if (res.success_count > 0) {
+          await refreshCustomers();
+        }
+      } catch (err) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Upload";
+        showBulkUploadError("Network error. Please try again.");
+      }
+    }
+
+    function setupBulkUploadModal() {
+      const dropZone = document.getElementById("dropZone");
+      const fileInput = document.getElementById("bulkUploadFileInput");
+
+      document.getElementById("bulkUploadBtn").addEventListener("click", openBulkUploadModal);
+      document.getElementById("closeBulkUploadBtn").addEventListener("click", closeBulkUploadModal);
+      document.getElementById("closeBulkUploadOverlay").addEventListener("click", closeBulkUploadModal);
+      document.getElementById("cancelBulkUploadBtn").addEventListener("click", closeBulkUploadModal);
+
+      dropZone.addEventListener("click", () => fileInput.click());
+
+      fileInput.addEventListener("change", (e) => {
+        handleBulkUploadFile(e.target.files[0]);
+      });
+
+      dropZone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropZone.classList.add("border-emerald-500", "bg-emerald-50");
+      });
+
+      dropZone.addEventListener("dragleave", () => {
+        dropZone.classList.remove("border-emerald-500", "bg-emerald-50");
+      });
+
+      dropZone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropZone.classList.remove("border-emerald-500", "bg-emerald-50");
+        if (e.dataTransfer.files.length > 0) {
+          handleBulkUploadFile(e.dataTransfer.files[0]);
+        }
+      });
+
+      document.getElementById("downloadTemplateBtn").addEventListener("click", () => {
+        window.location.href = "customers.php?action=download_template";
+      });
+
+      document.getElementById("submitBulkUploadBtn").addEventListener("click", submitBulkUpload);
+    }
+
     function setupSidebar() {
       const menuToggle = document.getElementById("menuToggle");
       const sidebar = document.getElementById("sidebar");
@@ -1709,6 +2097,7 @@ $conn->close();
     window.addEventListener("load", function() {
       renderList();
       setupSidebar();
+      setupBulkUploadModal();
       updateTypeFilterWidth();
       updateStatusFilterWidth();
 

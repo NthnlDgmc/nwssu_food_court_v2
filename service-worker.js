@@ -1,12 +1,13 @@
-const CACHE_NAME = 'nwssu-foodcourt-v3';
+const CACHE_NAME = 'nwssu-foodcourt-v1';
 const OFFLINE_URL = 'offline.php';
 
 const STATIC_ASSETS = [
     'manifest.json',
     'assets/images/nwssu-logo.png',
-    'assets/images/nwssu.png',
     'assets/images/icon-192.png',
     'assets/images/icon-512.png',
+    'assets/images/nwssu-logo.svg',
+    'assets/illustrations/success.lottie',
     OFFLINE_URL
 ];
 
