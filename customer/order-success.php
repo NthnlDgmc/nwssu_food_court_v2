@@ -1,12 +1,27 @@
 <?php
 session_start();
 require_once '../config/database.php';
-$conn->close();
 
 if (!isset($_SESSION['customer_id'])) {
+  $conn->close();
   header('Location: ../auth/login.php');
   exit;
 }
+
+$customerId = $_SESSION['customer_id'];
+$profileCheckStmt = $conn->prepare("SELECT email, contact_number FROM customers WHERE customer_id = ? LIMIT 1");
+$profileCheckStmt->bind_param("i", $customerId);
+$profileCheckStmt->execute();
+$profileCheckRow = $profileCheckStmt->get_result()->fetch_assoc();
+$profileCheckStmt->close();
+
+if (!$profileCheckRow || empty($profileCheckRow['email']) || empty($profileCheckRow['contact_number'])) {
+  $conn->close();
+  header('Location: ../auth/complete-profile.php');
+  exit;
+}
+
+$conn->close();
 
 $orderCount = (int) ($_GET['count'] ?? 1);
 if ($orderCount < 1) {
@@ -27,7 +42,11 @@ $displayAmount = (float) ($_GET['total'] ?? 0);
   <title>Order Placed - NWSSU Food Court</title>
   <link rel="icon" href="../assets/images/nwssu-logo.png" type="image/png" />
   <link rel="manifest" href="../manifest.json" />
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="../assets/css/tailwind.css" rel="stylesheet" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Norwesso Eats" />
+  <link rel="apple-touch-icon" href="../assets/images/icon-192.png" />
   <script src="https://unpkg.com/@lottiefiles/dotlottie-wc@0.9.4/dist/dotlottie-wc.js" type="module"></script>
   <style>
     @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");

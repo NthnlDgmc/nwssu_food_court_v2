@@ -14,6 +14,7 @@ function isStrongPassword($password)
 {
   if (strlen($password) < 8) return false;
   if (!preg_match('/[A-Z]/', $password)) return false;
+  if (!preg_match('/[a-z]/', $password)) return false;
   if (!preg_match('/[0-9]/', $password)) return false;
   if (!preg_match('/[^A-Za-z0-9]/', $password)) return false;
   return true;
@@ -124,13 +125,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       $conn->close();
       exit;
     }
+    if (!preg_match('/^09\d{9}$/', $contact)) {
+      echo json_encode(['success' => false, 'message' => 'Please enter a valid mobile number.']);
+      $conn->close();
+      exit;
+    }
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
       echo json_encode(['success' => false, 'message' => 'Please enter a valid email address.']);
       $conn->close();
       exit;
     }
     if (!isStrongPassword($password)) {
-      echo json_encode(['success' => false, 'message' => 'Password must be at least 8 characters and include an uppercase letter, a number, and a symbol.']);
+      echo json_encode(['success' => false, 'message' => 'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a symbol.']);
       $conn->close();
       exit;
     }
@@ -319,7 +325,11 @@ if (!$customer) {
   <title>NWSSU Food Court — Complete Profile</title>
   <link rel="icon" href="../assets/images/nwssu-logo.png" type="image/png" />
   <link rel="manifest" href="../manifest.json" />
-  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Norwesso Eats" />
+  <link rel="apple-touch-icon" href="../assets/images/icon-192.png" />
+  <link href="../assets/css/tailwind.css" rel="stylesheet" />
   <style>
     @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
 
@@ -449,6 +459,7 @@ if (!$customer) {
             id="contactNumber"
             placeholder="0917 123 4567"
             class="w-full px-3 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600 rounded-[3px]" />
+          <p class="text-[10px] mt-1.5 hidden text-red-500" id="contactErrorMsg"></p>
         </div>
 
         <div>
@@ -458,6 +469,7 @@ if (!$customer) {
             id="emailInput"
             placeholder="example@email.com"
             class="w-full px-3 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600 rounded-[3px]" />
+          <p class="text-[10px] mt-1.5 hidden text-red-500" id="emailErrorMsg"></p>
         </div>
 
         <div>
@@ -491,17 +503,60 @@ if (!$customer) {
               </svg>
             </button>
           </div>
-          <p class="text-[10px] text-gray-400 mt-1.5">
-            At least 8 characters, with an uppercase letter, a number, and a symbol.
-          </p>
           <div class="mt-2">
-            <div class="flex gap-1">
+            <div class="flex items-center justify-between">
+              <p class="text-[10px] font-medium text-gray-500">Password Strength</p>
+              <p class="text-[10px] font-semibold" id="pwStrengthLabel"></p>
+            </div>
+            <div class="flex gap-1 mt-1.5">
               <div class="h-1 flex-1 bg-gray-200 transition-colors rounded-full" id="pwBar1"></div>
               <div class="h-1 flex-1 bg-gray-200 transition-colors rounded-full" id="pwBar2"></div>
               <div class="h-1 flex-1 bg-gray-200 transition-colors rounded-full" id="pwBar3"></div>
               <div class="h-1 flex-1 bg-gray-200 transition-colors rounded-full" id="pwBar4"></div>
+              <div class="h-1 flex-1 bg-gray-200 transition-colors rounded-full" id="pwBar5"></div>
             </div>
-            <p class="text-[10px] mt-1" id="pwStrengthLabel"></p>
+            <div class="flex items-center justify-between gap-1 mt-2">
+              <div class="flex items-center gap-1">
+                <span id="reqLenIcon" class="w-3 h-3 rounded-full border border-gray-300 flex items-center justify-center shrink-0 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="4" stroke="currentColor" class="w-2 h-2 text-white opacity-0 transition-opacity">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                  </svg>
+                </span>
+                <span id="reqLenText" class="text-[9px] text-gray-400 transition-colors">8 Chars</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <span id="reqUpperIcon" class="w-3 h-3 rounded-full border border-gray-300 flex items-center justify-center shrink-0 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="4" stroke="currentColor" class="w-2 h-2 text-white opacity-0 transition-opacity">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                  </svg>
+                </span>
+                <span id="reqUpperText" class="text-[9px] text-gray-400 transition-colors">A-Z</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <span id="reqLowerIcon" class="w-3 h-3 rounded-full border border-gray-300 flex items-center justify-center shrink-0 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="4" stroke="currentColor" class="w-2 h-2 text-white opacity-0 transition-opacity">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                  </svg>
+                </span>
+                <span id="reqLowerText" class="text-[9px] text-gray-400 transition-colors">a-z</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <span id="reqNumIcon" class="w-3 h-3 rounded-full border border-gray-300 flex items-center justify-center shrink-0 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="4" stroke="currentColor" class="w-2 h-2 text-white opacity-0 transition-opacity">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                  </svg>
+                </span>
+                <span id="reqNumText" class="text-[9px] text-gray-400 transition-colors">123</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <span id="reqSymbolIcon" class="w-3 h-3 rounded-full border border-gray-300 flex items-center justify-center shrink-0 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="4" stroke="currentColor" class="w-2 h-2 text-white opacity-0 transition-opacity">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                  </svg>
+                </span>
+                <span id="reqSymbolText" class="text-[9px] text-gray-400 transition-colors">@#$</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -719,8 +774,38 @@ if (!$customer) {
     makeToggle("pwToggle1", passwordInput, "pwIcon1");
     makeToggle("pwToggle2", confirmPassword, "pwIcon2");
 
+    function checkContactValidity() {
+      const tel = contactNumber.value.trim();
+      const errMsg = document.getElementById("contactErrorMsg");
+      if (!tel) {
+        errMsg.classList.add("hidden");
+        return;
+      }
+      if (tel.length !== 11) {
+        errMsg.textContent = "Mobile number must be 11 digits.";
+        errMsg.classList.remove("hidden");
+      } else if (!tel.startsWith("09")) {
+        errMsg.textContent = "Please enter a valid mobile number.";
+        errMsg.classList.remove("hidden");
+      } else {
+        errMsg.classList.add("hidden");
+      }
+    }
+
     contactNumber.addEventListener("input", () => {
+      const cursorPos = contactNumber.selectionStart;
+      const cleaned = contactNumber.value.replace(/\D/g, "").slice(0, 11);
+      if (cleaned !== contactNumber.value) {
+        const removedCount = contactNumber.value.length - cleaned.length;
+        contactNumber.value = cleaned;
+        const newPos = Math.max(0, cursorPos - removedCount);
+        contactNumber.setSelectionRange(newPos, newPos);
+      }
       hideError();
+    });
+
+    contactNumber.addEventListener("blur", () => {
+      checkContactValidity();
     });
 
     const pwLevels = [{
@@ -739,11 +824,16 @@ if (!$customer) {
       },
       {
         label: "Good",
+        color: "bg-amber-500",
+        textCls: "text-amber-600"
+      },
+      {
+        label: "Strong",
         color: "bg-emerald-500",
         textCls: "text-emerald-600"
       },
       {
-        label: "Strong",
+        label: "Very Strong",
         color: "bg-emerald-700",
         textCls: "text-emerald-700"
       },
@@ -753,21 +843,54 @@ if (!$customer) {
       let s = 0;
       if (pw.length >= 8) s++;
       if (/[A-Z]/.test(pw)) s++;
+      if (/[a-z]/.test(pw)) s++;
       if (/[0-9]/.test(pw)) s++;
       if (/[^A-Za-z0-9]/.test(pw)) s++;
       return s;
     }
+
+    function updateReqIcon(iconId, textId, met, hasInput) {
+      const icon = document.getElementById(iconId);
+      const text = document.getElementById(textId);
+      const check = icon.querySelector("svg");
+
+      icon.classList.remove("border-gray-300", "border-red-400", "bg-emerald-600", "border-emerald-600");
+      text.classList.remove("text-gray-400", "text-red-500", "text-emerald-600");
+
+      if (!hasInput) {
+        icon.classList.add("border-gray-300");
+        text.classList.add("text-gray-400");
+        check.classList.add("opacity-0");
+      } else if (met) {
+        icon.classList.add("bg-emerald-600", "border-emerald-600");
+        text.classList.add("text-emerald-600");
+        check.classList.remove("opacity-0");
+      } else {
+        icon.classList.add("border-red-400");
+        text.classList.add("text-red-500");
+        check.classList.add("opacity-0");
+      }
+    }
+
     passwordInput.addEventListener("input", () => {
       const pw = passwordInput.value;
       const score = pw.length === 0 ? 0 : Math.max(1, getPwStrength(pw));
       const level = pwLevels[score];
-      [1, 2, 3, 4].forEach((n, i) => {
+      [1, 2, 3, 4, 5].forEach((n, i) => {
         const b = document.getElementById("pwBar" + n);
         b.className = `h-1 flex-1 transition-colors rounded-full ${i < score ? level.color : "bg-gray-200"}`;
       });
       const lbl = document.getElementById("pwStrengthLabel");
       lbl.textContent = pw.length > 0 ? level.label : "";
-      lbl.className = `text-[10px] mt-1 ${score > 0 ? level.textCls : "text-gray-400"}`;
+      lbl.className = `text-[10px] font-semibold ${score > 0 ? level.textCls : "text-gray-400"}`;
+
+      const hasInput = pw.length > 0;
+      updateReqIcon("reqLenIcon", "reqLenText", pw.length >= 8, hasInput);
+      updateReqIcon("reqUpperIcon", "reqUpperText", /[A-Z]/.test(pw), hasInput);
+      updateReqIcon("reqLowerIcon", "reqLowerText", /[a-z]/.test(pw), hasInput);
+      updateReqIcon("reqNumIcon", "reqNumText", /[0-9]/.test(pw), hasInput);
+      updateReqIcon("reqSymbolIcon", "reqSymbolText", /[^A-Za-z0-9]/.test(pw), hasInput);
+
       checkMatch();
       hideError();
     });
@@ -796,6 +919,21 @@ if (!$customer) {
     });
 
     emailInput.addEventListener("input", hideError);
+
+    function checkEmailValidity() {
+      const em = emailInput.value.trim();
+      const errMsg = document.getElementById("emailErrorMsg");
+      if (!em || isValidEmail(em)) {
+        errMsg.classList.add("hidden");
+      } else {
+        errMsg.textContent = "Please enter a valid email address.";
+        errMsg.classList.remove("hidden");
+      }
+    }
+
+    emailInput.addEventListener("blur", () => {
+      checkEmailValidity();
+    });
 
     function isValidEmail(val) {
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
@@ -841,6 +979,11 @@ if (!$customer) {
         markError(contactNumber);
         return;
       }
+      if (tel.length !== 11 || !tel.startsWith("09")) {
+        showError("Please enter a valid mobile number.");
+        markError(contactNumber);
+        return;
+      }
       if (!em) {
         showError("Please enter your email address.");
         markError(emailInput);
@@ -857,7 +1000,7 @@ if (!$customer) {
         return;
       }
       if (!isStrongPassword(pw)) {
-        showError("Password must be at least 8 characters and include an uppercase letter, a number, and a symbol.");
+        showError("Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a symbol.");
         markError(passwordInput);
         return;
       }

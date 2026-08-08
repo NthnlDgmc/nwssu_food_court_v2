@@ -408,7 +408,7 @@ $conn->close();
   <title>Stall - Dashboard</title>
   <link rel="icon" href="../assets/images/nwssu-logo.png" type="image/png" />
   <link rel="manifest" href="../manifest.json" />
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="../assets/css/tailwind.css" rel="stylesheet" />
   <style>
     @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
 

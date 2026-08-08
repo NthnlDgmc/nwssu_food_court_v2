@@ -1,0 +1,25 @@
+{
+  "name": "nwssu_food_court",
+  "version": "1.0.0",
+  "description": "CAPSTONE TITLE:\r A Web-Based Food Court Ordering System for Northwest Samar State University (NwSSU)",
+  "main": "service-worker.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NthnlDgmc/nwssu_food_court_v2.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/NthnlDgmc/nwssu_food_court_v2/issues"
+  },
+  "homepage": "https://github.com/NthnlDgmc/nwssu_food_court_v2#readme",
+  "dependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "tailwindcss": "^4.3.3"
+  }
+}

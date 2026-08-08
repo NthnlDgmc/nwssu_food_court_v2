@@ -175,9 +175,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>NWSSU Food Court — Sign In</title>
-    <link rel="icon" href="assets/images/nwssu-logo.svg" type="image/svg+xml" />
+    <link rel="icon" href="../assets/images/nwssu-logo.png" type="image/png" />
     <link rel="manifest" href="../manifest.json" />
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Norwesso Eats" />
+    <link rel="apple-touch-icon" href="../assets/images/icon-192.png" />
+    <link href="../assets/css/tailwind.css" rel="stylesheet" />
     <style>
       @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
       * {

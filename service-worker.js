@@ -8,6 +8,7 @@ const STATIC_ASSETS = [
     'assets/images/icon-512.png',
     'assets/images/nwssu-logo.svg',
     'assets/illustrations/success.lottie',
+    'assets/css/tailwind.css',
     OFFLINE_URL
 ];
 

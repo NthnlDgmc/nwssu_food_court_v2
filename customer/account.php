@@ -1,7 +1,6 @@
 <?php
 session_start();
 require_once '../config/database.php';
-require_once '../config/vapid.php';
 require_once '../config/version.php';
 require_once '../config/app-url.php';
 
@@ -12,7 +11,7 @@ if (!isset($_SESSION['customer_id'])) {
 
 $customerId = $_SESSION['customer_id'];
 
-$statusCheckStmt = $conn->prepare("SELECT status FROM customers WHERE customer_id = ? LIMIT 1");
+$statusCheckStmt = $conn->prepare("SELECT status, email, contact_number FROM customers WHERE customer_id = ? LIMIT 1");
 $statusCheckStmt->bind_param("i", $customerId);
 $statusCheckStmt->execute();
 $statusCheckRow = $statusCheckStmt->get_result()->fetch_assoc();
@@ -21,6 +20,11 @@ $statusCheckStmt->close();
 if (!$statusCheckRow || $statusCheckRow['status'] === 'inactive') {
   session_destroy();
   header('Location: ../auth/login.php?deactivated=1');
+  exit;
+}
+
+if (empty($statusCheckRow['email']) || empty($statusCheckRow['contact_number'])) {
+  header('Location: ../auth/complete-profile.php');
   exit;
 }
 
@@ -90,6 +94,7 @@ function isStrongPassword($password)
 {
   if (strlen($password) < 8) return false;
   if (!preg_match('/[A-Z]/', $password)) return false;
+  if (!preg_match('/[a-z]/', $password)) return false;
   if (!preg_match('/[0-9]/', $password)) return false;
   if (!preg_match('/[^A-Za-z0-9]/', $password)) return false;
   return true;
@@ -128,6 +133,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
     if ($contact === '') {
       echo json_encode(['success' => false, 'message' => 'Please enter a contact number.']);
+      $conn->close();
+      exit;
+    }
+    if (!preg_match('/^09\d{9}$/', $contact)) {
+      echo json_encode(['success' => false, 'message' => 'Please enter a valid mobile number.']);
       $conn->close();
       exit;
     }
@@ -198,7 +208,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
     if (!isStrongPassword($newPw)) {
-      echo json_encode(['success' => false, 'message' => 'New password must be at least 8 characters and include an uppercase letter, a number, and a symbol.']);
+      echo json_encode(['success' => false, 'message' => 'New password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a symbol.']);
       $conn->close();
       exit;
     }
@@ -302,6 +312,10 @@ if (!$initialProfile) {
   <title>Customer - My Account</title>
   <link rel="icon" href="../assets/images/nwssu-logo.png" type="image/png" />
   <link rel="manifest" href="/manifest.json" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Norwesso Eats" />
+  <link rel="apple-touch-icon" href="../assets/images/icon-192.png" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
@@ -446,20 +460,6 @@ if (!$initialProfile) {
                 </svg>
               </span>
               <span class="flex-1 text-xs font-medium text-gray-700">Change Password</span>
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-300 shrink-0">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-              </svg>
-            </button>
-            <button
-              id="notificationsBtn"
-              class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">
-              <span class="w-8 h-8 bg-gray-100 flex items-center justify-center shrink-0 rounded-[3px]">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
-                </svg>
-              </span>
-              <span class="flex-1 text-xs font-medium text-gray-700">Notifications</span>
-              <span id="notifStatusBadge" class="text-[10px] text-gray-400 shrink-0">Off</span>
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-300 shrink-0">
                 <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
               </svg>
@@ -680,11 +680,13 @@ if (!$initialProfile) {
         <div>
           <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Contact Number</label>
           <input type="tel" id="fieldContact" placeholder="0917 123 4567" class="w-full px-3 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600 rounded-[3px]" />
+          <p class="text-[10px] mt-1.5 hidden text-red-500" id="fieldContactErrorMsg"></p>
         </div>
 
         <div>
           <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Email Address</label>
           <input type="email" id="fieldEmail" placeholder="example@email.com" class="w-full px-3 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600 rounded-[3px]" />
+          <p class="text-[10px] mt-1.5 hidden text-red-500" id="fieldEmailErrorMsg"></p>
         </div>
       </div>
       <div class="px-4 pb-4 flex gap-2">
@@ -788,17 +790,60 @@ if (!$initialProfile) {
               </svg>
             </button>
           </div>
-          <p class="text-[10px] text-gray-400 mt-1.5">
-            At least 8 characters, with an uppercase letter, a number, and a symbol.
-          </p>
           <div class="mt-2">
-            <div class="flex gap-1">
+            <div class="flex items-center justify-between">
+              <p class="text-[10px] font-medium text-gray-500">Password Strength</p>
+              <p class="text-[10px] font-semibold" id="pwStrengthLabel"></p>
+            </div>
+            <div class="flex gap-1 mt-1.5">
               <div class="h-1 flex-1 bg-gray-200 transition-colors rounded-full" id="pwBar1"></div>
               <div class="h-1 flex-1 bg-gray-200 transition-colors rounded-full" id="pwBar2"></div>
               <div class="h-1 flex-1 bg-gray-200 transition-colors rounded-full" id="pwBar3"></div>
               <div class="h-1 flex-1 bg-gray-200 transition-colors rounded-full" id="pwBar4"></div>
+              <div class="h-1 flex-1 bg-gray-200 transition-colors rounded-full" id="pwBar5"></div>
             </div>
-            <p class="text-[10px] mt-1" id="pwStrengthLabel"></p>
+            <div class="flex items-center justify-between gap-1 mt-2">
+              <div class="flex items-center gap-1">
+                <span id="pwReqLenIcon" class="w-3 h-3 rounded-full border border-gray-300 flex items-center justify-center shrink-0 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="4" stroke="currentColor" class="w-2 h-2 text-white opacity-0 transition-opacity">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                  </svg>
+                </span>
+                <span id="pwReqLenText" class="text-[10px] text-gray-400 transition-colors">8 Chars</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <span id="pwReqUpperIcon" class="w-3 h-3 rounded-full border border-gray-300 flex items-center justify-center shrink-0 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="4" stroke="currentColor" class="w-2 h-2 text-white opacity-0 transition-opacity">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                  </svg>
+                </span>
+                <span id="pwReqUpperText" class="text-[10px] text-gray-400 transition-colors">A-Z</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <span id="pwReqLowerIcon" class="w-3 h-3 rounded-full border border-gray-300 flex items-center justify-center shrink-0 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="4" stroke="currentColor" class="w-2 h-2 text-white opacity-0 transition-opacity">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                  </svg>
+                </span>
+                <span id="pwReqLowerText" class="text-[10px] text-gray-400 transition-colors">a-z</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <span id="pwReqNumIcon" class="w-3 h-3 rounded-full border border-gray-300 flex items-center justify-center shrink-0 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="4" stroke="currentColor" class="w-2 h-2 text-white opacity-0 transition-opacity">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                  </svg>
+                </span>
+                <span id="pwReqNumText" class="text-[10px] text-gray-400 transition-colors">123</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <span id="pwReqSymbolIcon" class="w-3 h-3 rounded-full border border-gray-300 flex items-center justify-center shrink-0 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="4" stroke="currentColor" class="w-2 h-2 text-white opacity-0 transition-opacity">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                  </svg>
+                </span>
+                <span id="pwReqSymbolText" class="text-[10px] text-gray-400 transition-colors">@#$</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -844,36 +889,6 @@ if (!$initialProfile) {
         <button id="saveChangePasswordBtn" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-70 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors rounded-[3px]">
           Update Password
         </button>
-      </div>
-    </div>
-  </div>
-
-  <div
-    id="notificationsModal"
-    class="fixed inset-0 z-50 hidden flex items-center justify-center px-4">
-    <div class="modal-overlay absolute inset-0" id="closeNotificationsOverlay"></div>
-    <div
-      class="bg-white w-full max-w-md max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl rounded-md">
-      <div class="p-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
-        <h2 class="font-bold text-gray-800 text-sm">Notifications</h2>
-        <button id="closeNotificationsBtn" class="p-1 hover:bg-gray-100 rounded-[3px]">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-      <div class="p-4">
-        <div class="flex items-center justify-between gap-3">
-          <div class="min-w-0">
-            <p class="text-xs font-semibold text-gray-800">Push Notifications</p>
-            <p id="notifStatusLabel" class="text-[10px] text-gray-400 mt-0.5">Off</p>
-          </div>
-          <label class="relative inline-flex items-center cursor-pointer shrink-0">
-            <input type="checkbox" id="notifToggle" class="sr-only peer" />
-            <div class="w-11 h-6 bg-gray-300 peer-checked:bg-emerald-500 rounded-full transition-colors"></div>
-            <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5 shadow"></div>
-          </label>
-        </div>
       </div>
     </div>
   </div>
@@ -1184,147 +1199,6 @@ if (!$initialProfile) {
       return ((first[0] || "") + (last[0] || "")).toUpperCase();
     }
 
-    const VAPID_PUBLIC_KEY = "<?php echo VAPID_PUBLIC_KEY; ?>";
-
-    function urlBase64ToUint8Array(base64String) {
-      const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-      const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-      const rawData = window.atob(base64);
-      const outputArray = new Uint8Array(rawData.length);
-      for (let i = 0; i < rawData.length; i++) {
-        outputArray[i] = rawData.charCodeAt(i);
-      }
-      return outputArray;
-    }
-
-    async function subscribeToPush() {
-      const registration = await navigator.serviceWorker.register("../service-worker.js");
-      await navigator.serviceWorker.ready;
-
-      const existingSubscription = await registration.pushManager.getSubscription();
-      const subscription = existingSubscription || (await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-      }));
-
-      await fetch("../save-push-subscription.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(subscription),
-      });
-
-      return true;
-    }
-
-    async function unsubscribeFromPush() {
-      if (!("serviceWorker" in navigator)) return;
-
-      const registration = await navigator.serviceWorker.getRegistration();
-      if (!registration) return;
-
-      const subscription = await registration.pushManager.getSubscription();
-      if (!subscription) return;
-
-      await fetch("../remove-push-subscription.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ endpoint: subscription.endpoint }),
-      });
-
-      await subscription.unsubscribe();
-    }
-
-    function openNotificationsModal() {
-      document.getElementById("notificationsModal").classList.remove("hidden");
-      document.body.style.overflow = "hidden";
-    }
-
-    function closeNotificationsModal() {
-      document.getElementById("notificationsModal").classList.add("hidden");
-      document.body.style.overflow = "";
-    }
-
-    async function setupNotificationToggle() {
-      const toggle = document.getElementById("notifToggle");
-      const label = document.getElementById("notifStatusLabel");
-      const badge = document.getElementById("notifStatusBadge");
-
-      document.getElementById("notificationsBtn").addEventListener("click", openNotificationsModal);
-      document.getElementById("closeNotificationsBtn").addEventListener("click", closeNotificationsModal);
-
-      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-        toggle.disabled = true;
-        label.textContent = "Not supported on this device";
-        badge.textContent = "Unsupported";
-        return;
-      }
-
-      let isSubscribed = false;
-      if (Notification.permission === "granted") {
-        const registration = await navigator.serviceWorker.getRegistration();
-        if (registration) {
-          const subscription = await registration.pushManager.getSubscription();
-          if (subscription) {
-            isSubscribed = true;
-            await fetch("../save-push-subscription.php", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(subscription),
-            });
-          }
-        }
-      }
-
-      toggle.checked = isSubscribed;
-      label.textContent = isSubscribed ? "On" : "Off";
-      badge.textContent = isSubscribed ? "On" : "Off";
-
-      toggle.addEventListener("change", async () => {
-        toggle.disabled = true;
-
-        if (toggle.checked) {
-          if (Notification.permission === "denied") {
-            toggle.checked = false;
-            toggle.disabled = false;
-            alert("Notifications are blocked in your browser settings. Please enable them manually to turn this on.");
-            return;
-          }
-
-          const permission = Notification.permission === "granted" ?
-            "granted" :
-            await Notification.requestPermission();
-
-          if (permission !== "granted") {
-            toggle.checked = false;
-            toggle.disabled = false;
-            return;
-          }
-
-          try {
-            await subscribeToPush();
-            localStorage.removeItem("notificationsOptedOut");
-            label.textContent = "On";
-            badge.textContent = "On";
-            showToast("Notifications turned on");
-          } catch (err) {
-            toggle.checked = false;
-          }
-        } else {
-          try {
-            await unsubscribeFromPush();
-            localStorage.setItem("notificationsOptedOut", "1");
-            label.textContent = "Off";
-            badge.textContent = "Off";
-            showToast("Notifications turned off");
-          } catch (err) {
-            toggle.checked = true;
-          }
-        }
-
-        toggle.disabled = false;
-      });
-    }
-
     function isValidEmail(val) {
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
     }
@@ -1337,16 +1211,13 @@ if (!$initialProfile) {
         .replace(/(^|[\s'-])\p{L}/gu, (c) => c.toUpperCase());
     }
 
-    function isValidName(val) {
-      return /^[\p{L}\s'-]+$/u.test(val);
-    }
-
     const pwLevels = [
       { label: "", color: "bg-gray-200", textCls: "text-gray-400" },
       { label: "Weak", color: "bg-red-400", textCls: "text-red-500" },
       { label: "Fair", color: "bg-amber-400", textCls: "text-amber-500" },
-      { label: "Good", color: "bg-emerald-500", textCls: "text-emerald-600" },
-      { label: "Strong", color: "bg-emerald-700", textCls: "text-emerald-700" },
+      { label: "Good", color: "bg-amber-500", textCls: "text-amber-600" },
+      { label: "Strong", color: "bg-emerald-500", textCls: "text-emerald-600" },
+      { label: "Very Strong", color: "bg-emerald-700", textCls: "text-emerald-700" },
     ];
 
     let currentProfileImageFile = null;
@@ -1507,23 +1378,18 @@ if (!$initialProfile) {
         document.getElementById("fieldFirstName").classList.add("error");
         return;
       }
-      if (!isValidName(firstName)) {
-        showEditProfileError("First name can only contain letters.");
-        document.getElementById("fieldFirstName").classList.add("error");
-        return;
-      }
       if (!lastName) {
         showEditProfileError("Last name is required.");
         document.getElementById("fieldLastName").classList.add("error");
         return;
       }
-      if (!isValidName(lastName)) {
-        showEditProfileError("Last name can only contain letters.");
-        document.getElementById("fieldLastName").classList.add("error");
-        return;
-      }
       if (!contact) {
         showEditProfileError("Please enter a contact number.");
+        document.getElementById("fieldContact").classList.add("error");
+        return;
+      }
+      if (contact.length !== 11 || !contact.startsWith("09")) {
+        showEditProfileError("Please enter a valid mobile number.");
         document.getElementById("fieldContact").classList.add("error");
         return;
       }
@@ -1611,11 +1477,26 @@ if (!$initialProfile) {
         document.getElementById(iconId).innerHTML =
           `<path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>`;
       });
-      [1, 2, 3, 4].forEach((n) => {
+      [1, 2, 3, 4, 5].forEach((n) => {
         const b = document.getElementById("pwBar" + n);
         b.className = "h-1 flex-1 bg-gray-200 transition-colors rounded-full";
       });
       document.getElementById("pwStrengthLabel").textContent = "";
+      [
+        ["pwReqLenIcon", "pwReqLenText"],
+        ["pwReqUpperIcon", "pwReqUpperText"],
+        ["pwReqLowerIcon", "pwReqLowerText"],
+        ["pwReqNumIcon", "pwReqNumText"],
+        ["pwReqSymbolIcon", "pwReqSymbolText"],
+      ].forEach(([iconId, textId]) => {
+        const icon = document.getElementById(iconId);
+        const text = document.getElementById(textId);
+        icon.classList.remove("border-red-400", "bg-emerald-600", "border-emerald-600");
+        icon.classList.add("border-gray-300");
+        icon.querySelector("svg").classList.add("opacity-0");
+        text.classList.remove("text-red-500", "text-emerald-600");
+        text.classList.add("text-gray-400");
+      });
       document
         .querySelectorAll("#changePasswordModal input")
         .forEach((el) => el.classList.remove("error"));
@@ -1643,6 +1524,7 @@ if (!$initialProfile) {
       return (
         pw.length >= 8 &&
         /[A-Z]/.test(pw) &&
+        /[a-z]/.test(pw) &&
         /[0-9]/.test(pw) &&
         /[^A-Za-z0-9]/.test(pw)
       );
@@ -1652,9 +1534,33 @@ if (!$initialProfile) {
       let s = 0;
       if (pw.length >= 8) s++;
       if (/[A-Z]/.test(pw)) s++;
+      if (/[a-z]/.test(pw)) s++;
       if (/[0-9]/.test(pw)) s++;
       if (/[^A-Za-z0-9]/.test(pw)) s++;
       return s;
+    }
+
+    function updatePwReqIcon(iconId, textId, met, hasInput) {
+      const icon = document.getElementById(iconId);
+      const text = document.getElementById(textId);
+      const check = icon.querySelector("svg");
+
+      icon.classList.remove("border-gray-300", "border-red-400", "bg-emerald-600", "border-emerald-600");
+      text.classList.remove("text-gray-400", "text-red-500", "text-emerald-600");
+
+      if (!hasInput) {
+        icon.classList.add("border-gray-300");
+        text.classList.add("text-gray-400");
+        check.classList.add("opacity-0");
+      } else if (met) {
+        icon.classList.add("bg-emerald-600", "border-emerald-600");
+        text.classList.add("text-emerald-600");
+        check.classList.remove("opacity-0");
+      } else {
+        icon.classList.add("border-red-400");
+        text.classList.add("text-red-500");
+        check.classList.add("opacity-0");
+      }
     }
 
     function checkPwMatch() {
@@ -1696,7 +1602,7 @@ if (!$initialProfile) {
         return;
       }
       if (!isStrongPassword(newPw)) {
-        showPasswordError("New password must be at least 8 characters and include an uppercase letter, a number, and a symbol.");
+        showPasswordError("New password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a symbol.");
         document.getElementById("fieldNewPassword").classList.add("error");
         return;
       }
@@ -1757,9 +1663,42 @@ if (!$initialProfile) {
         });
       });
 
-      document.getElementById("fieldEmail").addEventListener("input", (e) => {
+      function checkFieldEmailValidity() {
+        const em = document.getElementById("fieldEmail").value.trim();
+        const errMsg = document.getElementById("fieldEmailErrorMsg");
+        if (!em || isValidEmail(em)) {
+          errMsg.classList.add("hidden");
+        } else {
+          errMsg.textContent = "Please enter a valid email address.";
+          errMsg.classList.remove("hidden");
+        }
+      }
+
+      document.getElementById("fieldEmail").addEventListener("blur", () => {
+        checkFieldEmailValidity();
+      });
+
+      function checkFieldContactValidity() {
+        const tel = document.getElementById("fieldContact").value.trim();
+        const errMsg = document.getElementById("fieldContactErrorMsg");
+        if (!tel) {
+          errMsg.classList.add("hidden");
+          return;
+        }
+        if (tel.length !== 11) {
+          errMsg.textContent = "Mobile number must be 11 digits.";
+          errMsg.classList.remove("hidden");
+        } else if (!tel.startsWith("09")) {
+          errMsg.textContent = "Please enter a valid mobile number.";
+          errMsg.classList.remove("hidden");
+        } else {
+          errMsg.classList.add("hidden");
+        }
+      }
+
+      document.getElementById("fieldContact").addEventListener("input", (e) => {
         const cursorPos = e.target.selectionStart;
-        const cleaned = e.target.value.replace(/\s/g, "");
+        const cleaned = e.target.value.replace(/\D/g, "").slice(0, 11);
         if (cleaned !== e.target.value) {
           const removedCount = e.target.value.length - cleaned.length;
           e.target.value = cleaned;
@@ -1768,11 +1707,8 @@ if (!$initialProfile) {
         }
       });
 
-      document.getElementById("fieldEmail").addEventListener("blur", (e) => {
-        if (e.target.value.trim()) {
-          e.target.value = e.target.value.trim().toLowerCase();
-          checkForEditProfileChanges();
-        }
+      document.getElementById("fieldContact").addEventListener("blur", () => {
+        checkFieldContactValidity();
       });
 
       document.getElementById("editProfileImageBtn").addEventListener("click", () =>
@@ -1815,13 +1751,21 @@ if (!$initialProfile) {
         const pw = document.getElementById("fieldNewPassword").value;
         const score = pw.length === 0 ? 0 : Math.max(1, getPwStrength(pw));
         const level = pwLevels[score];
-        [1, 2, 3, 4].forEach((n, i) => {
+        [1, 2, 3, 4, 5].forEach((n, i) => {
           const b = document.getElementById("pwBar" + n);
           b.className = `h-1 flex-1 transition-colors rounded-full ${i < score ? level.color : "bg-gray-200"}`;
         });
         const lbl = document.getElementById("pwStrengthLabel");
         lbl.textContent = pw.length > 0 ? level.label : "";
-        lbl.className = `text-[10px] mt-1 ${score > 0 ? level.textCls : "text-gray-400"}`;
+        lbl.className = `text-[10px] font-semibold ${score > 0 ? level.textCls : "text-gray-400"}`;
+
+        const hasInput = pw.length > 0;
+        updatePwReqIcon("pwReqLenIcon", "pwReqLenText", pw.length >= 8, hasInput);
+        updatePwReqIcon("pwReqUpperIcon", "pwReqUpperText", /[A-Z]/.test(pw), hasInput);
+        updatePwReqIcon("pwReqLowerIcon", "pwReqLowerText", /[a-z]/.test(pw), hasInput);
+        updatePwReqIcon("pwReqNumIcon", "pwReqNumText", /[0-9]/.test(pw), hasInput);
+        updatePwReqIcon("pwReqSymbolIcon", "pwReqSymbolText", /[^A-Za-z0-9]/.test(pw), hasInput);
+
         checkPwMatch();
       });
       document.getElementById("fieldConfirmPassword").addEventListener("input", checkPwMatch);
@@ -1925,7 +1869,6 @@ if (!$initialProfile) {
       setupTermsPrivacyModal();
       setupLogoutModal();
       setupDeleteAccountModal();
-      setupNotificationToggle();
     }
 
     window.addEventListener("load", init);

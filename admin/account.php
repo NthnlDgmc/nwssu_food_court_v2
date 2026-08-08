@@ -2,6 +2,7 @@
 session_start();
 require_once '../config/database.php';
 require_once '../config/version.php';
+require_once '../config/app-url.php';
 
 if (!isset($_SESSION['admin_id'])) {
     header('Location: ../auth/login.php');
@@ -74,6 +75,7 @@ function isStrongPassword($password)
 {
     if (strlen($password) < 8) return false;
     if (!preg_match('/[A-Z]/', $password)) return false;
+    if (!preg_match('/[a-z]/', $password)) return false;
     if (!preg_match('/[0-9]/', $password)) return false;
     if (!preg_match('/[^A-Za-z0-9]/', $password)) return false;
     return true;
@@ -108,6 +110,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         if ($contact === '') {
             echo json_encode(['success' => false, 'message' => 'Please enter a contact number.']);
+            exit;
+        }
+        if (!preg_match('/^09\d{9}$/', $contact)) {
+            echo json_encode(['success' => false, 'message' => 'Please enter a valid mobile number.']);
             exit;
         }
         if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -176,7 +182,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             exit;
         }
         if (!isStrongPassword($newPw)) {
-            echo json_encode(['success' => false, 'message' => 'New password must be at least 8 characters and include an uppercase letter, a number, and a symbol.']);
+            echo json_encode(['success' => false, 'message' => 'New password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a symbol.']);
             exit;
         }
         if ($newPw !== $confirmPw) {
@@ -253,7 +259,7 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
     <title>Admin - My Account</title>
     <link rel="icon" href="../assets/images/nwssu-logo.png" type="image/png" />
     <link rel="manifest" href="/manifest.json" />
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="../assets/css/tailwind.css" rel="stylesheet" />
     <style>
       @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
       * {
@@ -284,17 +290,6 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
       }
       input.error {
         border-color: #f87171;
-      }
-
-      #toast {
-        opacity: 0;
-        transform: translate(-50%, 8px);
-        transition: opacity 0.25s ease, transform 0.25s ease;
-      }
-
-      #toast.toast-visible {
-        opacity: 1;
-        transform: translate(-50%, 0);
       }
 
       #sidebar {
@@ -380,19 +375,22 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
       <aside id="sidebar">
         <div class="flex items-center justify-between px-4 py-4 border-b border-gray-100 shrink-0">
           <a href="./account.php" class="flex items-center gap-2.5 min-w-0">
-            <div id="sidebarAvatar" class="w-9 h-9 bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-white font-bold text-xs shrink-0 rounded-full overflow-hidden">
+            <div class="w-9 h-9 bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-white font-bold text-xs shrink-0 overflow-hidden rounded-full">
               <?php if ($adminProfileImage): ?>
-                <img src="<?php echo htmlspecialchars($adminProfileImage); ?>" alt="<?php echo htmlspecialchars($adminFullName); ?>" class="w-full h-full object-cover" />
+                <img
+                  src="<?php echo htmlspecialchars($adminProfileImage); ?>"
+                  alt="<?php echo htmlspecialchars($adminFullName); ?>"
+                  class="w-full h-full object-cover" />
               <?php else: ?>
                 <?php echo htmlspecialchars($adminInitials); ?>
               <?php endif; ?>
             </div>
             <div class="min-w-0">
-              <p id="sidebarName" class="text-sm font-bold text-gray-800 truncate"><?php echo htmlspecialchars($adminFullName); ?></p>
+              <p class="text-sm font-bold text-gray-800 truncate"><?php echo htmlspecialchars($adminFullName); ?></p>
               <p class="text-[10px] text-gray-400 truncate">System Administrator</p>
             </div>
           </a>
-          <button id="closeSidebar" class="p-1.5 hover:bg-gray-100 transition-colors text-gray-500" style="border-radius: 3px" aria-label="Close menu">
+          <button id="closeSidebar" class="p-1.5 hover:bg-gray-100 transition-colors text-gray-500" style="border-radius:3px" aria-label="Close menu">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
             </svg>
@@ -400,10 +398,11 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
         </div>
 
         <nav class="flex-1 overflow-y-auto py-3 px-3 space-y-1">
+
           <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 pt-1 pb-1.5">Main</p>
 
-          <a href="./dashboard.php" class="sidebar-link flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent font-medium transition-colors" style="border-radius: 6px">
-            <span class="w-8 h-8 flex items-center justify-center bg-gray-100 shrink-0" style="border-radius: 3px">
+          <a href="./dashboard.php" class="sidebar-link flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent font-medium transition-colors" style="border-radius:6px">
+            <span class="w-8 h-8 flex items-center justify-center bg-gray-100 shrink-0" style="border-radius:3px">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
               </svg>
@@ -411,8 +410,8 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
             <span class="text-sm">Dashboard</span>
           </a>
 
-          <a href="./chat.php" class="sidebar-link flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent font-medium transition-colors" style="border-radius: 6px">
-            <span class="w-8 h-8 flex items-center justify-center bg-gray-100 shrink-0 relative" style="border-radius: 3px">
+          <a href="./chat.php" class="sidebar-link flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent font-medium transition-colors" style="border-radius:6px">
+            <span class="w-8 h-8 flex items-center justify-center bg-gray-100 shrink-0 relative" style="border-radius:3px">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 0 1-.923 1.785A5.969 5.969 0 0 0 6 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337Z" />
               </svg>
@@ -422,8 +421,8 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
 
           <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 pt-3 pb-1.5">Manage</p>
 
-          <a href="./stalls.php" class="sidebar-link flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent font-medium transition-colors" style="border-radius: 6px">
-            <span class="w-8 h-8 flex items-center justify-center bg-gray-100 shrink-0" style="border-radius: 3px">
+          <a href="./stalls.php" class="sidebar-link flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent font-medium transition-colors" style="border-radius:6px">
+            <span class="w-8 h-8 flex items-center justify-center bg-gray-100 shrink-0" style="border-radius:3px">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5 4.5 3h15L21 7.5m-18 0v12a1.5 1.5 0 0 0 1.5 1.5h15a1.5 1.5 0 0 0 1.5-1.5v-12m-18 0h18M9 12h6" />
               </svg>
@@ -431,8 +430,8 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
             <span class="text-sm">Stalls</span>
           </a>
 
-          <a href="./stall-owners.php" class="sidebar-link flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent font-medium transition-colors" style="border-radius: 6px">
-            <span class="w-8 h-8 flex items-center justify-center bg-gray-100 shrink-0" style="border-radius: 3px">
+          <a href="./stall-owners.php" class="sidebar-link flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent font-medium transition-colors" style="border-radius:6px">
+            <span class="w-8 h-8 flex items-center justify-center bg-gray-100 shrink-0" style="border-radius:3px">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
               </svg>
@@ -440,8 +439,8 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
             <span class="text-sm">Stall Owners</span>
           </a>
 
-          <a href="./delivery-staff.php" class="sidebar-link flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent font-medium transition-colors" style="border-radius: 6px">
-            <span class="w-8 h-8 flex items-center justify-center bg-gray-100 shrink-0" style="border-radius: 3px">
+          <a href="./delivery-staff.php" class="sidebar-link flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent font-medium transition-colors" style="border-radius:6px">
+            <span class="w-8 h-8 flex items-center justify-center bg-gray-100 shrink-0" style="border-radius:3px">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
               </svg>
@@ -449,8 +448,8 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
             <span class="text-sm">Delivery Staff</span>
           </a>
 
-          <a href="./customers.php" class="sidebar-link flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent font-medium transition-colors" style="border-radius: 6px">
-            <span class="w-8 h-8 flex items-center justify-center bg-gray-100 shrink-0" style="border-radius: 3px">
+          <a href="./customers.php" class="sidebar-link flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent font-medium transition-colors" style="border-radius:6px">
+            <span class="w-8 h-8 flex items-center justify-center bg-gray-100 shrink-0" style="border-radius:3px">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
               </svg>
@@ -458,8 +457,8 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
             <span class="text-sm">Customers</span>
           </a>
 
-          <a href="./categories.php" class="sidebar-link flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent font-medium transition-colors" style="border-radius: 6px">
-            <span class="w-8 h-8 flex items-center justify-center bg-gray-100 shrink-0" style="border-radius: 3px">
+          <a href="./categories.php" class="sidebar-link flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent font-medium transition-colors" style="border-radius:6px">
+            <span class="w-8 h-8 flex items-center justify-center bg-gray-100 shrink-0" style="border-radius:3px">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
               </svg>
@@ -468,21 +467,29 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
           </a>
           <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 pt-3 pb-1.5">Account</p>
 
-          <a href="./account.php" class="sidebar-link active flex items-center gap-3 px-3 py-2.5 text-emerald-700 bg-emerald-50 border border-emerald-100 font-semibold transition-colors" style="border-radius: 6px">
-            <span class="w-8 h-8 flex items-center justify-center bg-emerald-600 shrink-0" style="border-radius: 3px">
+          <a href="./account.php" class="sidebar-link active flex items-center gap-3 px-3 py-2.5 text-emerald-700 bg-emerald-50 border border-emerald-100 font-semibold transition-colors" style="border-radius:6px">
+            <span class="w-8 h-8 flex items-center justify-center bg-emerald-600 shrink-0" style="border-radius:3px">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-white">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
               </svg>
             </span>
             <span class="text-sm">My Account</span>
           </a>
+
         </nav>
       </aside>
 
       <div class="flex-1 overflow-y-auto mt-12" id="mainContent">
         <div class="max-w-5xl mx-auto px-4 pt-3 pb-6 space-y-3">
           <div class="rounded-md bg-white border border-gray-200 shadow-sm p-4">
-            <div class="flex items-center gap-3">
+            <div id="profileSkeleton" class="flex items-center gap-3 animate-pulse">
+              <div class="w-16 h-16 bg-gray-200 shrink-0 rounded-full"></div>
+              <div class="flex-1 min-w-0 space-y-2">
+                <div class="h-4 bg-gray-200 rounded w-32"></div>
+                <div class="h-3 bg-gray-200 rounded w-40"></div>
+              </div>
+            </div>
+            <div id="profileContent" class="hidden items-center gap-3">
               <div
                 id="profileAvatar"
                 class="w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-white font-bold text-xl shrink-0 rounded-full overflow-hidden"
@@ -575,29 +582,14 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
             </div>
             <div class="divide-y divide-gray-100">
               <button
-                class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
-                data-info="For assistance, please message the development team via the Chats tab."
-              >
+                id="shareAppBtn"
+                class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">
                 <span class="w-8 h-8 bg-gray-100 flex items-center justify-center shrink-0" style="border-radius:3px">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
                   </svg>
                 </span>
-                <span class="flex-1 text-xs font-medium text-gray-700">Help Center</span>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-300 shrink-0">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                </svg>
-              </button>
-              <button
-                class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
-                data-info="Terms of Service and Privacy Policy are coming soon."
-              >
-                <span class="w-8 h-8 bg-gray-100 flex items-center justify-center shrink-0" style="border-radius:3px">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-                  </svg>
-                </span>
-                <span class="flex-1 text-xs font-medium text-gray-700">Terms &amp; Privacy Policy</span>
+                <span class="flex-1 text-xs font-medium text-gray-700">Share App</span>
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-300 shrink-0">
                   <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                 </svg>
@@ -743,11 +735,13 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
           <div>
             <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Contact Number</label>
             <input type="tel" id="fieldContact" placeholder="0917 123 4567" class="w-full px-3 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600" style="border-radius: 3px" />
+            <p class="text-[10px] mt-1.5 hidden text-red-500" id="fieldContactErrorMsg"></p>
           </div>
 
           <div>
             <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Email Address</label>
             <input type="email" id="fieldEmail" placeholder="example@email.com" class="w-full px-3 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600" style="border-radius: 3px" />
+            <p class="text-[10px] mt-1.5 hidden text-red-500" id="fieldEmailErrorMsg"></p>
           </div>
         </div>
         <div class="px-4 pb-4 flex gap-2">
@@ -756,6 +750,45 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
           </button>
           <button id="saveEditProfileBtn" disabled class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors" style="border-radius: 3px">
             Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="shareAppModal"
+      class="fixed inset-0 z-50 hidden flex items-center justify-center px-4">
+      <div class="modal-overlay absolute inset-0" id="closeShareAppOverlay"></div>
+      <div
+        class="bg-white w-full max-w-sm relative z-10 shadow-2xl p-5 space-y-4 text-center"
+        style="border-radius: 6px">
+        <div>
+          <p class="text-sm font-bold text-gray-800">Share NWSSU Food Court</p>
+          <p class="text-xs text-gray-500 mt-1">Let someone scan this code to open the app.</p>
+        </div>
+        <div class="flex items-center justify-center">
+          <div class="p-3 border border-gray-200" style="border-radius: 6px">
+            <img
+              id="shareAppQrImg"
+              src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&amp;data=<?php echo urlencode(APP_URL); ?>"
+              alt="App QR Code"
+              class="w-44 h-44" />
+          </div>
+        </div>
+        <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 px-3 py-2.5" style="border-radius: 3px">
+          <p id="shareAppUrlText" class="flex-1 text-xs text-gray-600 truncate text-left"><?php echo htmlspecialchars(APP_URL); ?></p>
+          <button id="copyShareAppUrlBtn" class="shrink-0 p-1 hover:bg-gray-200 transition-colors" style="border-radius: 3px">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" />
+            </svg>
+          </button>
+        </div>
+        <div class="flex gap-2">
+          <button id="downloadShareAppQrBtn" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors flex items-center justify-center" style="border-radius: 3px">
+            Download QR
+          </button>
+          <button id="closeShareAppBtn" class="flex-1 py-2.5 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors" style="border-radius: 3px">
+            Close
           </button>
         </div>
       </div>
@@ -864,17 +897,60 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
                 </svg>
               </button>
             </div>
-            <p class="text-[10px] text-gray-400 mt-1.5">
-              At least 8 characters, with an uppercase letter, a number, and a symbol.
-            </p>
             <div class="mt-2">
-              <div class="flex gap-1">
+              <div class="flex items-center justify-between">
+                <p class="text-[10px] font-medium text-gray-500">Password Strength</p>
+                <p class="text-[10px] font-semibold" id="pwStrengthLabel"></p>
+              </div>
+              <div class="flex gap-1 mt-1.5">
                 <div class="h-1 flex-1 bg-gray-200 transition-colors" style="border-radius: 999px" id="pwBar1"></div>
                 <div class="h-1 flex-1 bg-gray-200 transition-colors" style="border-radius: 999px" id="pwBar2"></div>
                 <div class="h-1 flex-1 bg-gray-200 transition-colors" style="border-radius: 999px" id="pwBar3"></div>
                 <div class="h-1 flex-1 bg-gray-200 transition-colors" style="border-radius: 999px" id="pwBar4"></div>
+                <div class="h-1 flex-1 bg-gray-200 transition-colors" style="border-radius: 999px" id="pwBar5"></div>
               </div>
-              <p class="text-[10px] mt-1" id="pwStrengthLabel"></p>
+              <div class="flex items-center justify-between gap-1 mt-2">
+                <div class="flex items-center gap-1">
+                  <span id="pwReqLenIcon" class="w-3 h-3 rounded-full border border-gray-300 flex items-center justify-center shrink-0 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="4" stroke="currentColor" class="w-2 h-2 text-white opacity-0 transition-opacity">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                    </svg>
+                  </span>
+                  <span id="pwReqLenText" class="text-[10px] text-gray-400 transition-colors">8 Chars</span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <span id="pwReqUpperIcon" class="w-3 h-3 rounded-full border border-gray-300 flex items-center justify-center shrink-0 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="4" stroke="currentColor" class="w-2 h-2 text-white opacity-0 transition-opacity">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                    </svg>
+                  </span>
+                  <span id="pwReqUpperText" class="text-[10px] text-gray-400 transition-colors">A-Z</span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <span id="pwReqLowerIcon" class="w-3 h-3 rounded-full border border-gray-300 flex items-center justify-center shrink-0 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="4" stroke="currentColor" class="w-2 h-2 text-white opacity-0 transition-opacity">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                    </svg>
+                  </span>
+                  <span id="pwReqLowerText" class="text-[10px] text-gray-400 transition-colors">a-z</span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <span id="pwReqNumIcon" class="w-3 h-3 rounded-full border border-gray-300 flex items-center justify-center shrink-0 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="4" stroke="currentColor" class="w-2 h-2 text-white opacity-0 transition-opacity">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                    </svg>
+                  </span>
+                  <span id="pwReqNumText" class="text-[10px] text-gray-400 transition-colors">123</span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <span id="pwReqSymbolIcon" class="w-3 h-3 rounded-full border border-gray-300 flex items-center justify-center shrink-0 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="4" stroke="currentColor" class="w-2 h-2 text-white opacity-0 transition-opacity">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                    </svg>
+                  </span>
+                  <span id="pwReqSymbolText" class="text-[10px] text-gray-400 transition-colors">@#$</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -961,8 +1037,8 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
       id="toast"
       class="hidden items-center gap-2 fixed left-1/2 bottom-6 z-40 -translate-x-1/2 max-w-[calc(100%-2rem)] bg-gray-900 text-white text-xs font-medium px-4 py-2.5 shadow-lg"
       style="border-radius: 6px">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-emerald-400 shrink-0">
-        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+      <svg id="toastIconSvg" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-emerald-400 shrink-0">
+        <path id="toastIconPath" stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
       </svg>
       <span id="toastMessage" class="truncate"></span>
     </div>
@@ -1009,31 +1085,32 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
       }
 
       let toastHideTimeout = null;
-      let toastRemoveTimeout = null;
 
-      function showToast(message) {
+      function showToast(message, type = "success") {
         const toast = document.getElementById("toast");
         const toastMessage = document.getElementById("toastMessage");
+        const iconSvg = document.getElementById("toastIconSvg");
+        const iconPath = document.getElementById("toastIconPath");
         toastMessage.textContent = message;
 
+        if (type === "warning") {
+          iconSvg.classList.remove("text-emerald-400");
+          iconSvg.classList.add("text-amber-400");
+          iconPath.setAttribute("d", "M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z");
+        } else {
+          iconSvg.classList.remove("text-amber-400");
+          iconSvg.classList.add("text-emerald-400");
+          iconPath.setAttribute("d", "M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z");
+        }
+
         if (toastHideTimeout) clearTimeout(toastHideTimeout);
-        if (toastRemoveTimeout) clearTimeout(toastRemoveTimeout);
 
         toast.classList.remove("hidden");
         toast.classList.add("flex");
 
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            toast.classList.add("toast-visible");
-          });
-        });
-
         toastHideTimeout = setTimeout(() => {
-          toast.classList.remove("toast-visible");
-          toastRemoveTimeout = setTimeout(() => {
-            toast.classList.add("hidden");
-            toast.classList.remove("flex");
-          }, 250);
+          toast.classList.add("hidden");
+          toast.classList.remove("flex");
         }, 2000);
       }
 
@@ -1047,13 +1124,14 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
           ? `<img src="${escapeHtml(adminAccount.profileImage)}" class="w-full h-full object-cover" style="border-radius:50%" />`
           : initials;
         document.getElementById("profileAvatar").innerHTML = avatarHtml;
-        document.getElementById("sidebarAvatar").innerHTML = avatarHtml;
         document.getElementById("profileName").textContent =
-          adminAccount.firstName + " " + adminAccount.lastName;
-        document.getElementById("sidebarName").textContent =
           adminAccount.firstName + " " + adminAccount.lastName;
         document.getElementById("profileSubtext").textContent = adminAccount.email;
         document.getElementById("statMemberSince").textContent = adminAccount.memberSince;
+
+        document.getElementById("profileSkeleton").classList.add("hidden");
+        document.getElementById("profileContent").classList.remove("hidden");
+        document.getElementById("profileContent").classList.add("flex");
       }
 
       function updateEditProfilePreview(src, initials) {
@@ -1180,6 +1258,11 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
           document.getElementById("fieldContact").classList.add("error");
           return;
         }
+        if (contact.length !== 11 || !contact.startsWith("09")) {
+          showEditProfileError("Please enter a valid mobile number.");
+          document.getElementById("fieldContact").classList.add("error");
+          return;
+        }
         if (!email || !isValidEmail(email)) {
           showEditProfileError("Please enter a valid email address.");
           document.getElementById("fieldEmail").classList.add("error");
@@ -1249,12 +1332,27 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
           document.getElementById(iconId).innerHTML =
             `<path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>`;
         });
-        [1, 2, 3, 4].forEach((n) => {
+        [1, 2, 3, 4, 5].forEach((n) => {
           const b = document.getElementById("pwBar" + n);
           b.className = "h-1 flex-1 bg-gray-200 transition-colors";
           b.style.borderRadius = "999px";
         });
         document.getElementById("pwStrengthLabel").textContent = "";
+        [
+          ["pwReqLenIcon", "pwReqLenText"],
+          ["pwReqUpperIcon", "pwReqUpperText"],
+          ["pwReqLowerIcon", "pwReqLowerText"],
+          ["pwReqNumIcon", "pwReqNumText"],
+          ["pwReqSymbolIcon", "pwReqSymbolText"],
+        ].forEach(([iconId, textId]) => {
+          const icon = document.getElementById(iconId);
+          const text = document.getElementById(textId);
+          icon.classList.remove("border-red-400", "bg-emerald-600", "border-emerald-600");
+          icon.classList.add("border-gray-300");
+          icon.querySelector("svg").classList.add("opacity-0");
+          text.classList.remove("text-red-500", "text-emerald-600");
+          text.classList.add("text-gray-400");
+        });
         document
           .querySelectorAll("#changePasswordModal input")
           .forEach((el) => el.classList.remove("error"));
@@ -1281,17 +1379,42 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
         { label: "", color: "bg-gray-200" },
         { label: "Weak", color: "bg-red-400", textCls: "text-red-500" },
         { label: "Fair", color: "bg-amber-400", textCls: "text-amber-500" },
-        { label: "Good", color: "bg-emerald-500", textCls: "text-emerald-600" },
-        { label: "Strong", color: "bg-emerald-700", textCls: "text-emerald-700" },
+        { label: "Good", color: "bg-amber-500", textCls: "text-amber-600" },
+        { label: "Strong", color: "bg-emerald-500", textCls: "text-emerald-600" },
+        { label: "Very Strong", color: "bg-emerald-700", textCls: "text-emerald-700" },
       ];
 
       function getPwStrength(pw) {
         let s = 0;
         if (pw.length >= 8) s++;
         if (/[A-Z]/.test(pw)) s++;
+        if (/[a-z]/.test(pw)) s++;
         if (/[0-9]/.test(pw)) s++;
         if (/[^A-Za-z0-9]/.test(pw)) s++;
         return s;
+      }
+
+      function updatePwReqIcon(iconId, textId, met, hasInput) {
+        const icon = document.getElementById(iconId);
+        const text = document.getElementById(textId);
+        const check = icon.querySelector("svg");
+
+        icon.classList.remove("border-gray-300", "border-red-400", "bg-emerald-600", "border-emerald-600");
+        text.classList.remove("text-gray-400", "text-red-500", "text-emerald-600");
+
+        if (!hasInput) {
+          icon.classList.add("border-gray-300");
+          text.classList.add("text-gray-400");
+          check.classList.add("opacity-0");
+        } else if (met) {
+          icon.classList.add("bg-emerald-600", "border-emerald-600");
+          text.classList.add("text-emerald-600");
+          check.classList.remove("opacity-0");
+        } else {
+          icon.classList.add("border-red-400");
+          text.classList.add("text-red-500");
+          check.classList.add("opacity-0");
+        }
       }
 
       function checkPwMatch() {
@@ -1316,6 +1439,7 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
         return (
           pw.length >= 8 &&
           /[A-Z]/.test(pw) &&
+          /[a-z]/.test(pw) &&
           /[0-9]/.test(pw) &&
           /[^A-Za-z0-9]/.test(pw)
         );
@@ -1343,7 +1467,7 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
           return;
         }
         if (!isStrongPassword(newPw)) {
-          showPasswordError("New password must be at least 8 characters and include an uppercase letter, a number, and a symbol.");
+          showPasswordError("New password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a symbol.");
           document.getElementById("fieldNewPassword").classList.add("error");
           return;
         }
@@ -1478,9 +1602,27 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
           });
         });
 
-        document.getElementById("fieldEmail").addEventListener("input", (e) => {
+        function checkFieldContactValidity() {
+          const tel = document.getElementById("fieldContact").value.trim();
+          const errMsg = document.getElementById("fieldContactErrorMsg");
+          if (!tel) {
+            errMsg.classList.add("hidden");
+            return;
+          }
+          if (tel.length !== 11) {
+            errMsg.textContent = "Mobile number must be 11 digits.";
+            errMsg.classList.remove("hidden");
+          } else if (!tel.startsWith("09")) {
+            errMsg.textContent = "Please enter a valid mobile number.";
+            errMsg.classList.remove("hidden");
+          } else {
+            errMsg.classList.add("hidden");
+          }
+        }
+
+        document.getElementById("fieldContact").addEventListener("input", (e) => {
           const cursorPos = e.target.selectionStart;
-          const cleaned = e.target.value.replace(/\s/g, "");
+          const cleaned = e.target.value.replace(/\D/g, "").slice(0, 11);
           if (cleaned !== e.target.value) {
             const removedCount = e.target.value.length - cleaned.length;
             e.target.value = cleaned;
@@ -1489,11 +1631,23 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
           }
         });
 
-        document.getElementById("fieldEmail").addEventListener("blur", (e) => {
-          if (e.target.value.trim()) {
-            e.target.value = e.target.value.trim().toLowerCase();
-            checkForEditProfileChanges();
+        document.getElementById("fieldContact").addEventListener("blur", () => {
+          checkFieldContactValidity();
+        });
+
+        function checkFieldEmailValidity() {
+          const em = document.getElementById("fieldEmail").value.trim();
+          const errMsg = document.getElementById("fieldEmailErrorMsg");
+          if (!em || isValidEmail(em)) {
+            errMsg.classList.add("hidden");
+          } else {
+            errMsg.textContent = "Please enter a valid email address.";
+            errMsg.classList.remove("hidden");
           }
+        }
+
+        document.getElementById("fieldEmail").addEventListener("blur", () => {
+          checkFieldEmailValidity();
         });
 
         document.getElementById("changePasswordBtn").addEventListener("click", openChangePasswordModal);
@@ -1501,6 +1655,46 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
         document.getElementById("closeChangePasswordOverlay").addEventListener("click", closeChangePasswordModal);
         document.getElementById("cancelChangePasswordBtn").addEventListener("click", closeChangePasswordModal);
         document.getElementById("saveChangePasswordBtn").addEventListener("click", saveChangePassword);
+
+        document.getElementById("shareAppBtn").addEventListener("click", () => {
+          document.getElementById("shareAppModal").classList.remove("hidden");
+          document.body.style.overflow = "hidden";
+        });
+        document.getElementById("closeShareAppBtn").addEventListener("click", () => {
+          document.getElementById("shareAppModal").classList.add("hidden");
+          document.body.style.overflow = "";
+        });
+        document.getElementById("closeShareAppOverlay").addEventListener("click", () => {
+          document.getElementById("shareAppModal").classList.add("hidden");
+          document.body.style.overflow = "";
+        });
+        document.getElementById("copyShareAppUrlBtn").addEventListener("click", async () => {
+          const url = document.getElementById("shareAppUrlText").textContent;
+          try {
+            await navigator.clipboard.writeText(url);
+            showToast("Link copied to clipboard");
+          } catch (err) {
+            showToast("Failed to copy link", "warning");
+          }
+        });
+
+        document.getElementById("downloadShareAppQrBtn").addEventListener("click", async () => {
+          const img = document.getElementById("shareAppQrImg");
+          try {
+            const response = await fetch(img.src);
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = blobUrl;
+            a.download = "nwssu-foodcourt-qr.png";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(blobUrl);
+          } catch (err) {
+            window.open(img.src, "_blank");
+          }
+        });
 
         function makePasswordToggle(btnId, inputId, iconId) {
           const btn = document.getElementById(btnId);
@@ -1522,14 +1716,22 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
           const pw = document.getElementById("fieldNewPassword").value;
           const score = pw.length === 0 ? 0 : Math.max(1, getPwStrength(pw));
           const level = pwLevels[score];
-          [1, 2, 3, 4].forEach((n, i) => {
+          [1, 2, 3, 4, 5].forEach((n, i) => {
             const b = document.getElementById("pwBar" + n);
             b.className = `h-1 flex-1 transition-colors ${i < score ? level.color : "bg-gray-200"}`;
             b.style.borderRadius = "999px";
           });
           const lbl = document.getElementById("pwStrengthLabel");
           lbl.textContent = pw.length > 0 ? level.label : "";
-          lbl.className = `text-[10px] mt-1 ${score > 0 ? level.textCls : "text-gray-400"}`;
+          lbl.className = `text-[10px] font-semibold ${score > 0 ? level.textCls : "text-gray-400"}`;
+
+          const hasInput = pw.length > 0;
+          updatePwReqIcon("pwReqLenIcon", "pwReqLenText", pw.length >= 8, hasInput);
+          updatePwReqIcon("pwReqUpperIcon", "pwReqUpperText", /[A-Z]/.test(pw), hasInput);
+          updatePwReqIcon("pwReqLowerIcon", "pwReqLowerText", /[a-z]/.test(pw), hasInput);
+          updatePwReqIcon("pwReqNumIcon", "pwReqNumText", /[0-9]/.test(pw), hasInput);
+          updatePwReqIcon("pwReqSymbolIcon", "pwReqSymbolText", /[^A-Za-z0-9]/.test(pw), hasInput);
+
           checkPwMatch();
         });
         document.getElementById("fieldConfirmPassword").addEventListener("input", checkPwMatch);

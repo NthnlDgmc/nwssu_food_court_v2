@@ -10,7 +10,7 @@ if (!isset($_SESSION['customer_id'])) {
 
 $customerId = $_SESSION['customer_id'];
 
-$statusCheckStmt = $conn->prepare("SELECT status FROM customers WHERE customer_id = ? LIMIT 1");
+$statusCheckStmt = $conn->prepare("SELECT status, email, contact_number FROM customers WHERE customer_id = ? LIMIT 1");
 $statusCheckStmt->bind_param("i", $customerId);
 $statusCheckStmt->execute();
 $statusCheckRow = $statusCheckStmt->get_result()->fetch_assoc();
@@ -19,6 +19,11 @@ $statusCheckStmt->close();
 if (!$statusCheckRow || $statusCheckRow['status'] === 'inactive') {
   session_destroy();
   header('Location: ../auth/login.php?deactivated=1');
+  exit;
+}
+
+if (empty($statusCheckRow['email']) || empty($statusCheckRow['contact_number'])) {
+  header('Location: ../auth/complete-profile.php');
   exit;
 }
 
@@ -327,7 +332,11 @@ $avatarInitial = mb_strtoupper(mb_substr($firstName, 0, 1));
   <title>NWSSU Food Court - Home</title>
   <link rel="icon" href="../assets/images/nwssu-logo.png" type="image/png" />
   <link rel="manifest" href="../manifest.json" />
-  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Norwesso Eats" />
+  <link rel="apple-touch-icon" href="../assets/images/icon-192.png" />
+  <link href="../assets/css/tailwind.css" rel="stylesheet" />
   <style>
     @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
 

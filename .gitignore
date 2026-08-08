@@ -1,0 +1,40 @@
+# Environment
+.env
+
+# Composer files
+composer.json
+composer.lock
+
+# Documentation
+README.md
+structure.md
+
+# Backup files
+/backup/
+
+# Dependencies
+/vendor/
+/node_modules/
+/PHPMailer/
+
+# Uploaded files
+/uploads/customers/*
+/uploads/admin/*
+/uploads/stall/*
+/uploads/delivery/*
+/uploads/menu_items/*
+/uploads/order_proofs/*
+
+# Keep folder structure
+!/uploads/customers/.gitkeep
+!/uploads/admin/.gitkeep
+!/uploads/stall/.gitkeep
+!/uploads/delivery/.gitkeep
+!/uploads/menu_items/.gitkeep
+!/uploads/order_proofs/.gitkeep
+
+# Secret keys / credentials
+config/paymongo.php
+config/database.php
+config/vapid.php
+config/mail.php
