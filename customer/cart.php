@@ -690,7 +690,7 @@ $conn->close();
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Norwesso Eats" />
   <link rel="apple-touch-icon" href="../assets/images/icon-192.png" />
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="../assets/css/tailwind.css" rel="stylesheet" />
   <style>
     @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
 
@@ -817,7 +817,7 @@ $conn->close();
         <div id="cartSkeleton">
           <div class="flex flex-col lg:flex-row gap-4 items-start">
             <div class="w-full lg:w-2/3 space-y-3">
-              <div class="rounded-md bg-white border border-gray-200 overflow-hidden shadow-sm">
+              <div class="rounded-md bg-white border border-gray-200 overflow-hidden">
                 <div class="p-3 border-b border-gray-100 flex items-center justify-between">
                   <div class="space-y-1.5">
                     <div class="h-3 w-20 skeleton-bg rounded-[3px]"></div>
@@ -842,7 +842,7 @@ $conn->close();
                   <div class="h-4 w-10 skeleton-bg shrink-0 rounded-[3px]"></div>
                 </div>
               </div>
-              <div class="rounded-md bg-white border border-gray-200 overflow-hidden shadow-sm">
+              <div class="rounded-md bg-white border border-gray-200 overflow-hidden">
                 <div class="p-3 border-b border-gray-100 flex items-center justify-between">
                   <div class="space-y-1.5">
                     <div class="h-3 w-20 skeleton-bg rounded-[3px]"></div>
@@ -860,7 +860,7 @@ $conn->close();
                 </div>
               </div>
             </div>
-            <div class="rounded-md w-full lg:w-1/3 bg-white border border-gray-200 shadow-sm">
+            <div class="rounded-md w-full lg:w-1/3 bg-white border border-gray-200">
               <div class="p-4 border-b border-gray-100">
                 <div class="h-3 w-24 skeleton-bg rounded-[3px]"></div>
               </div>
@@ -900,7 +900,7 @@ $conn->close();
 
           <div
             id="orderSummaryCard"
-            class="rounded-md w-full lg:w-1/3 bg-white border border-gray-200 shadow-sm lg:sticky lg:top-4">
+            class="rounded-md w-full lg:w-1/3 bg-white border border-gray-200 lg:sticky lg:top-4">
             <div class="p-4 border-b border-gray-100">
               <h3 class="text-xs font-bold text-gray-700">Order Summary</h3>
             </div>
@@ -1514,6 +1514,7 @@ $conn->close();
 
     function setOrderType(type) {
       globalOrderType = type;
+      localStorage.setItem("cart_orderType", type);
       const deliveryBtn = document.getElementById("orderTypeDelivery");
       const pickupBtn = document.getElementById("orderTypePickup");
       if (type === "delivery") {
@@ -1758,7 +1759,7 @@ $conn->close();
 
         const card = document.createElement("div");
         card.className =
-          "rounded-md bg-white border border-gray-200 overflow-hidden shadow-sm";
+          "rounded-md bg-white border border-gray-200 overflow-hidden";
 
         const itemsHTML = stallData.items
           .map(
@@ -1927,6 +1928,7 @@ $conn->close();
           savedLocation = document
             .getElementById("locationModalInput")
             .value.trim();
+          localStorage.setItem("cart_location", savedLocation);
           updateLocationButton();
           closeLocationModal();
         });
@@ -2007,6 +2009,14 @@ $conn->close();
         });
     }
 
+    function setupPaymentMethod() {
+      document.querySelectorAll('input[name="paymentMethod"]').forEach((radio) => {
+        radio.addEventListener("change", () => {
+          localStorage.setItem("cart_paymentMethod", radio.value);
+        });
+      });
+    }
+
     function setupCheckout() {
       document
         .getElementById("checkoutBtn")
@@ -2043,7 +2053,8 @@ $conn->close();
               "&ids=" + orderIdsParam +
               "&total=" + encodeURIComponent(res.total);
           } else {
-            alert((res.message || "Something went wrong. Please try again.") + (res.debug ? "\n\nDEBUG: " + res.debug : ""));
+            if (res.debug) console.log("DEBUG:", res.debug);
+            showToast(res.message || "Something went wrong. Please try again.", "warning");
           }
         });
     }
@@ -2067,13 +2078,36 @@ $conn->close();
       });
     }
 
+    function loadSavedPreferences() {
+      const savedOrderType = localStorage.getItem("cart_orderType");
+      if (savedOrderType === "delivery" || savedOrderType === "pickup") {
+        setOrderType(savedOrderType);
+      }
+
+      const savedLoc = localStorage.getItem("cart_location");
+      if (savedLoc) {
+        savedLocation = savedLoc;
+        updateLocationButton();
+      }
+
+      const savedPayment = localStorage.getItem("cart_paymentMethod");
+      if (savedPayment) {
+        const radio = document.querySelector(
+          'input[name="paymentMethod"][value="' + savedPayment + '"]'
+        );
+        if (radio) radio.checked = true;
+      }
+    }
+
     function init() {
       setupLocationModal();
       setupNoteModal();
       setupClearCart();
       setupCheckout();
+      setupPaymentMethod();
       setupBackButton();
       setupQtyDeselectOnOutsideClick();
+      loadSavedPreferences();
       setTimeout(() => loadCart(), 200);
     }
 

@@ -42,11 +42,11 @@ $displayAmount = (float) ($_GET['total'] ?? 0);
   <title>Order Placed - NWSSU Food Court</title>
   <link rel="icon" href="../assets/images/nwssu-logo.png" type="image/png" />
   <link rel="manifest" href="../manifest.json" />
-  <link href="../assets/css/tailwind.css" rel="stylesheet" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Norwesso Eats" />
   <link rel="apple-touch-icon" href="../assets/images/icon-192.png" />
+  <link href="../assets/css/tailwind.css" rel="stylesheet" />
   <script src="https://unpkg.com/@lottiefiles/dotlottie-wc@0.9.4/dist/dotlottie-wc.js" type="module"></script>
   <style>
     @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
@@ -131,6 +131,11 @@ $displayAmount = (float) ($_GET['total'] ?? 0);
       </a>
     </div>
   </div>
+  <script>
+    localStorage.removeItem("cart_orderType");
+    localStorage.removeItem("cart_location");
+    localStorage.removeItem("cart_paymentMethod");
+  </script>
 </body>
 
 </html>

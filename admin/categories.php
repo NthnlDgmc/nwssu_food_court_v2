@@ -141,14 +141,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
 
-    $stmt = $conn->prepare("DELETE FROM categories WHERE category_id = ?");
-    $stmt->bind_param("i", $categoryId);
-    $ok = $stmt->execute();
-    $stmt->close();
+    try {
+      $stmt = $conn->prepare("DELETE FROM categories WHERE category_id = ?");
+      $stmt->bind_param("i", $categoryId);
+      $ok = $stmt->execute();
+      $stmt->close();
 
-    echo json_encode($ok
-      ? ['success' => true]
-      : ['success' => false, 'message' => 'Failed to delete category.']);
+      echo json_encode($ok
+        ? ['success' => true]
+        : ['success' => false, 'message' => 'Failed to delete category.']);
+    } catch (\mysqli_sql_exception $e) {
+      if ($e->getCode() === 1451) {
+        echo json_encode(['success' => false, 'message' => 'Still in use — cannot delete']);
+      } else {
+        error_log('Delete category failed: ' . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => 'Failed to delete category.']);
+      }
+    }
     $conn->close();
     exit;
   }
@@ -181,6 +190,10 @@ $conn->close();
   <title>Admin - Categories</title>
   <link rel="icon" href="../assets/images/nwssu-logo.png" type="image/png" />
   <link rel="manifest" href="/manifest.json" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Norwesso Eats" />
+  <link rel="apple-touch-icon" href="/assets/images/icon-192.png" />
   <link href="../assets/css/tailwind.css" rel="stylesheet" />
   <style>
     @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
@@ -343,6 +356,7 @@ $conn->close();
       </div>
 
       <nav class="flex-1 overflow-y-auto py-3 px-3 space-y-1">
+
         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 pt-1 pb-1.5">Main</p>
 
         <a href="./dashboard.php" class="sidebar-link flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent font-medium transition-colors" style="border-radius:6px">
@@ -419,6 +433,7 @@ $conn->close();
           </span>
           <span class="text-sm">My Account</span>
         </a>
+
       </nav>
     </aside>
 
@@ -675,6 +690,16 @@ $conn->close();
       </div>
     </div>
   </div>
+
+  <div
+    id="toast"
+    class="hidden items-center gap-2 fixed left-1/2 bottom-6 z-40 -translate-x-1/2 max-w-[calc(100%-2rem)] bg-gray-900 text-white text-xs font-medium px-4 py-2.5 shadow-lg rounded-[6px]">
+    <svg id="toastIconSvg" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-emerald-400 shrink-0">
+      <path id="toastIconPath" stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+    </svg>
+    <span id="toastMessage" class="truncate"></span>
+  </div>
+
   <script>
     let categories = <?php echo json_encode($initialCategories); ?>;
 
@@ -682,6 +707,35 @@ $conn->close();
     let currentStatus = "all";
     let editingCategoryId = null;
     let deletingCategoryId = null;
+    let toastHideTimeout;
+
+    function showToast(message, type = "success") {
+      const toast = document.getElementById("toast");
+      const toastMessage = document.getElementById("toastMessage");
+      const iconSvg = document.getElementById("toastIconSvg");
+      const iconPath = document.getElementById("toastIconPath");
+      toastMessage.textContent = message;
+
+      if (type === "warning") {
+        iconSvg.classList.remove("text-emerald-400");
+        iconSvg.classList.add("text-amber-400");
+        iconPath.setAttribute("d", "M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z");
+      } else {
+        iconSvg.classList.remove("text-amber-400");
+        iconSvg.classList.add("text-emerald-400");
+        iconPath.setAttribute("d", "M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z");
+      }
+
+      if (toastHideTimeout) clearTimeout(toastHideTimeout);
+
+      toast.classList.remove("hidden");
+      toast.classList.add("flex");
+
+      toastHideTimeout = setTimeout(() => {
+        toast.classList.add("hidden");
+        toast.classList.remove("flex");
+      }, 2000);
+    }
 
     async function postAction(action, data = {}) {
       const formData = new FormData();
@@ -884,6 +938,7 @@ $conn->close();
 
       closeCategoryModal();
       await refreshCategories();
+      showToast(isEditing ? "Category updated successfully" : "Category added successfully");
     }
 
     function updateStatusFilterWidth() {
@@ -957,6 +1012,9 @@ $conn->close();
         closeDeleteCategoryModal();
         if (res.success) {
           await refreshCategories();
+          showToast("Category deleted successfully");
+        } else {
+          showToast(res.message || "Failed to delete category", "warning");
         }
       });
 

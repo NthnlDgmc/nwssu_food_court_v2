@@ -259,6 +259,10 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
     <title>Admin - My Account</title>
     <link rel="icon" href="../assets/images/nwssu-logo.png" type="image/png" />
     <link rel="manifest" href="/manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Norwesso Eats" />
+    <link rel="apple-touch-icon" href="/assets/images/icon-192.png" />
     <link href="../assets/css/tailwind.css" rel="stylesheet" />
     <style>
       @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
@@ -481,7 +485,7 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
 
       <div class="flex-1 overflow-y-auto mt-12" id="mainContent">
         <div class="max-w-5xl mx-auto px-4 pt-3 pb-6 space-y-3">
-          <div class="rounded-md bg-white border border-gray-200 shadow-sm p-4">
+          <div class="rounded-md bg-white border border-gray-200 p-4">
             <div id="profileSkeleton" class="flex items-center gap-3 animate-pulse">
               <div class="w-16 h-16 bg-gray-200 shrink-0 rounded-full"></div>
               <div class="flex-1 min-w-0 space-y-2">
@@ -526,17 +530,17 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
           </div>
 
           <div class="grid grid-cols-2 gap-2">
-            <div class="rounded-md bg-white border border-gray-200 shadow-sm p-3 text-center">
+            <div class="rounded-md bg-white border border-gray-200 p-3 text-center">
               <p class="text-base font-bold text-emerald-600">System Admin</p>
               <p class="text-[10px] text-gray-400 mt-0.5">Role</p>
             </div>
-            <div class="rounded-md bg-white border border-gray-200 shadow-sm p-3 text-center">
+            <div class="rounded-md bg-white border border-gray-200 p-3 text-center">
               <p id="statMemberSince" class="text-base font-bold text-emerald-600"></p>
               <p class="text-[10px] text-gray-400 mt-0.5">Member Since</p>
             </div>
           </div>
 
-          <div class="rounded-md bg-white border border-gray-200 shadow-sm overflow-hidden">
+          <div class="rounded-md bg-white border border-gray-200 overflow-hidden">
             <div class="p-4 border-b border-gray-100">
               <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
                 Account Settings
@@ -557,24 +561,10 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
                   <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                 </svg>
               </button>
-              <button
-                class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
-                data-info="Notification preferences are coming soon."
-              >
-                <span class="w-8 h-8 bg-gray-100 flex items-center justify-center shrink-0" style="border-radius:3px">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
-                  </svg>
-                </span>
-                <span class="flex-1 text-xs font-medium text-gray-700">Notifications</span>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-300 shrink-0">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                </svg>
-              </button>
             </div>
           </div>
 
-          <div class="rounded-md bg-white border border-gray-200 shadow-sm overflow-hidden">
+          <div class="rounded-md bg-white border border-gray-200 overflow-hidden">
             <div class="p-4 border-b border-gray-100">
               <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
                 Support
@@ -1735,10 +1725,6 @@ $adminInitials = getAdminInitials($initialProfile['first_name'], $initialProfile
           checkPwMatch();
         });
         document.getElementById("fieldConfirmPassword").addEventListener("input", checkPwMatch);
-
-        document.querySelectorAll(".account-row[data-info]").forEach((row) => {
-          row.addEventListener("click", () => alert(row.getAttribute("data-info")));
-        });
 
         document.getElementById("logoutBtn").addEventListener("click", openLogoutModal);
         document.getElementById("closeLogoutOverlay").addEventListener("click", closeLogoutModal);

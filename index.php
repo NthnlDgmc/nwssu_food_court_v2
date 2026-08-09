@@ -28,15 +28,6 @@ while ($row = $categoriesResult->fetch_assoc()) {
   ];
 }
 
-$stallsResult = $conn->query("SELECT stall_id, stall_name FROM stalls ORDER BY stall_name ASC");
-$stalls = [];
-while ($row = $stallsResult->fetch_assoc()) {
-  $stalls[] = [
-    'stall_id' => (int) $row['stall_id'],
-    'stall_name' => $row['stall_name'],
-  ];
-}
-
 $menuItemsResult = $conn->query("
     SELECT mi.menu_item_id, mi.item_name, mi.price, mi.image, mi.stall_id, s.stall_name, mi.category_id, c.category_name
     FROM menu_items mi
@@ -194,13 +185,13 @@ $conn->close();
     <div class="flex-1 overflow-y-auto mt-12" id="mainContent">
       <div class="max-w-5xl mx-auto px-4 pt-3 pb-6 space-y-3">
 
-        <div class="bg-white border border-gray-200 p-3 shadow-sm rounded-md">
+        <div class="bg-white border border-gray-200 p-3 rounded-md">
           <div class="flex gap-2">
             <div class="relative flex-1">
               <input
                 type="text"
                 id="searchInput"
-                placeholder="Search foods..."
+                placeholder="Search foods or stalls..."
                 class="w-full px-4 py-2 pl-10 pr-10 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 transition-all focus:outline-none focus:border-emerald-600 rounded-[3px]" />
               <div class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
@@ -213,77 +204,15 @@ $conn->close();
                 </svg>
               </button>
             </div>
-            <div class="relative">
-              <button type="button" id="stallFilterBtn" class="h-full px-3.5 py-2 bg-white border border-gray-200 text-xs font-medium text-gray-700 hover:border-emerald-500 transition-all flex items-center gap-1.5 whitespace-nowrap focus:outline-none focus:border-emerald-600 rounded-[3px]">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
-                </svg>
-                <span class="text-xs">Stall</span>
-              </button>
-              <div id="stallFilterDropdown" class="absolute right-0 mt-2 w-48 bg-white border border-gray-200 shadow-lg z-30 hidden rounded-[3px]">
-                <div class="p-3">
-                  <h3 class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
-                    </svg>
-                    Filter by Stall
-                  </h3>
-                  <div class="space-y-0.5 max-h-60 overflow-y-auto">
-                    <label class="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-2 py-1.5 rounded-[3px]">
-                      <input type="checkbox" class="stall-filter-checkbox" value="all" checked style="width:1rem;height:1rem;cursor:pointer;accent-color:#059669;" />
-                      <span class="text-xs text-gray-700">All Stalls</span>
-                    </label>
-                    <?php foreach ($stalls as $stall): ?>
-                      <label class="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-2 py-1.5 rounded-[3px]">
-                        <input type="checkbox" class="stall-filter-checkbox" value="<?php echo $stall['stall_id']; ?>" style="width:1rem;height:1rem;cursor:pointer;accent-color:#059669;" />
-                        <span class="text-xs text-gray-700"><?php echo htmlspecialchars($stall['stall_name']); ?></span>
-                      </label>
-                    <?php endforeach; ?>
-                  </div>
-                  <button type="button" id="resetStallFilter" class="w-full mt-2 py-1.5 px-3 bg-white border border-gray-200 text-gray-700 text-xs font-medium hover:border-emerald-500 transition-colors flex items-center justify-center gap-1.5 rounded-[3px]">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-                    </svg>
-                    Reset
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="flex justify-end gap-2 mt-2">
-            <div class="relative inline-block">
-              <select
-                id="sortSelect"
-                class="pl-2.5 pr-6 py-2 bg-white border border-gray-200 text-xs font-normal text-gray-700 focus:outline-none focus:border-emerald-600 appearance-none cursor-pointer rounded-[3px]">
-                <option value="newest">Newest</option>
-                <option value="price_low">Price: Low to High</option>
-                <option value="price_high">Price: High to Low</option>
-                <option value="name_az">Name: A-Z</option>
-                <option value="name_za">Name: Z-A</option>
-              </select>
-              <span id="sortSelectMeasure" class="text-xs font-normal" style="position: absolute; visibility: hidden; white-space: pre; left: -9999px; top: -9999px;"></span>
-              <script>
-                function updateSortSelectWidth() {
-                  const sortSelectEl = document.getElementById("sortSelect");
-                  const sortSelectMeasureEl = document.getElementById("sortSelectMeasure");
-                  if (!sortSelectEl || !sortSelectMeasureEl) return;
-                  const selectedText = sortSelectEl.options[sortSelectEl.selectedIndex].text;
-                  sortSelectMeasureEl.textContent = selectedText;
-                  const textWidth = sortSelectMeasureEl.offsetWidth;
-                  sortSelectEl.style.width = (textWidth + 38) + "px";
-                }
-                updateSortSelectWidth();
-              </script>
-              <div class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                </svg>
-              </div>
-            </div>
+            <button type="button" id="openFilterBtn" class="relative h-full px-3 py-2 bg-white border border-gray-200 text-gray-700 flex items-center justify-center focus:outline-none focus:border-emerald-600 rounded-[3px]">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
+              </svg>
+            </button>
           </div>
         </div>
 
-        <div class="bg-white border border-gray-200 p-3 shadow-sm rounded-md">
+        <div class="bg-white border border-gray-200 p-3 rounded-md">
           <div class="flex gap-2 overflow-x-auto no-scrollbar">
             <button class="category-btn category-active-custom px-4 py-2 border border-gray-200 bg-white flex-shrink-0 text-xs font-semibold whitespace-nowrap rounded-[3px]" data-cat-id="all">All</button>
             <?php foreach ($categories as $cat): ?>
@@ -401,6 +330,39 @@ $conn->close();
     </div>
   </div>
 
+  <div
+    id="filterModal"
+    class="fixed inset-0 z-50 hidden items-end sm:items-center justify-center">
+    <div class="modal-overlay absolute inset-0" id="closeFilterOverlay"></div>
+    <div class="bg-white w-full sm:max-w-md relative z-10 shadow-2xl max-h-[85vh] flex flex-col rounded-t-2xl sm:rounded-md">
+      <div class="p-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+        <h2 class="font-bold text-gray-800 text-sm">Sort By</h2>
+        <button id="closeFilterBtn" class="p-1 hover:bg-gray-100 rounded-[3px]">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-4 flex flex-col gap-2 overflow-y-auto">
+        <button type="button" class="sort-option-btn category-active-custom px-3 py-2.5 border border-gray-200 bg-white text-xs font-semibold text-gray-700 text-left rounded-[3px]" data-sort="newest">Newest</button>
+        <button type="button" class="sort-option-btn px-3 py-2.5 border border-gray-200 bg-white text-xs font-semibold text-gray-700 text-left hover:border-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-[3px]" data-sort="price_low">Price: Low to High</button>
+        <button type="button" class="sort-option-btn px-3 py-2.5 border border-gray-200 bg-white text-xs font-semibold text-gray-700 text-left hover:border-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-[3px]" data-sort="price_high">Price: High to Low</button>
+        <button type="button" class="sort-option-btn px-3 py-2.5 border border-gray-200 bg-white text-xs font-semibold text-gray-700 text-left hover:border-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-[3px]" data-sort="name_az">Name: A-Z</button>
+        <button type="button" class="sort-option-btn px-3 py-2.5 border border-gray-200 bg-white text-xs font-semibold text-gray-700 text-left hover:border-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-[3px]" data-sort="name_za">Name: Z-A</button>
+      </div>
+
+      <div class="p-4 border-t border-gray-100 flex gap-2 shrink-0">
+        <button type="button" id="resetFilterBtn" class="flex-1 py-2.5 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors rounded-[3px]">
+          Reset
+        </button>
+        <button type="button" id="applyFilterBtn" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors rounded-[3px]">
+          Apply
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const ALL_MENU_ITEMS = <?php echo json_encode($menuItems); ?>;
 
@@ -507,45 +469,54 @@ $conn->close();
     function initializeEventListeners() {
       setupSignInRequiredModal();
 
-      const stallFilterBtn = document.getElementById("stallFilterBtn");
-      const stallFilterDropdown = document.getElementById("stallFilterDropdown");
+      const filterModal = document.getElementById("filterModal");
+      const openFilterBtn = document.getElementById("openFilterBtn");
+      const closeFilterBtn = document.getElementById("closeFilterBtn");
+      const closeFilterOverlay = document.getElementById("closeFilterOverlay");
+      const applyFilterBtn = document.getElementById("applyFilterBtn");
+      const resetFilterBtn = document.getElementById("resetFilterBtn");
+      const sortOptionBtns = document.querySelectorAll(".sort-option-btn");
 
-      stallFilterBtn.addEventListener("click", function() {
-        stallFilterDropdown.classList.toggle("hidden");
-        const isOpen = !stallFilterDropdown.classList.contains("hidden");
-        stallFilterBtn.classList.toggle("border-emerald-600", isOpen);
-        stallFilterBtn.classList.toggle("text-emerald-700", isOpen);
-      });
+      function openFilterModal() {
+        filterModal.classList.remove("hidden");
+        filterModal.classList.add("flex");
+        document.body.style.overflow = "hidden";
+      }
 
-      document.addEventListener("click", function(e) {
-        if (!e.target.closest("#stallFilterBtn") && !e.target.closest("#stallFilterDropdown")) {
-          stallFilterDropdown.classList.add("hidden");
-          stallFilterBtn.classList.remove("border-emerald-600", "text-emerald-700");
-        }
-      });
+      function closeFilterModal() {
+        filterModal.classList.add("hidden");
+        filterModal.classList.remove("flex");
+        document.body.style.overflow = "";
+      }
 
-      const stallCheckboxes = document.querySelectorAll(".stall-filter-checkbox");
-      const allStallCheckbox = document.querySelector('.stall-filter-checkbox[value="all"]');
-      const specificStallCheckboxes = document.querySelectorAll('.stall-filter-checkbox:not([value="all"])');
+      function setActiveSortBtn(activeBtn) {
+        sortOptionBtns.forEach((btn) => {
+          btn.classList.remove("category-active-custom");
+          btn.classList.add("bg-white", "border-gray-200", "text-gray-700", "hover:border-emerald-500", "hover:text-emerald-600", "hover:bg-emerald-50");
+        });
+        activeBtn.classList.add("category-active-custom");
+        activeBtn.classList.remove("bg-white", "border-gray-200", "text-gray-700", "hover:border-emerald-500", "hover:text-emerald-600", "hover:bg-emerald-50");
+      }
 
-      allStallCheckbox.addEventListener("change", function() {
-        specificStallCheckboxes.forEach(cb => cb.checked = this.checked);
-        applyFilters();
-      });
+      openFilterBtn.addEventListener("click", openFilterModal);
+      closeFilterBtn.addEventListener("click", closeFilterModal);
+      closeFilterOverlay.addEventListener("click", closeFilterModal);
 
-      specificStallCheckboxes.forEach(cb => {
-        cb.addEventListener("change", function() {
-          const allChecked = Array.from(specificStallCheckboxes).every(c => c.checked);
-          const someChecked = Array.from(specificStallCheckboxes).some(c => c.checked);
-          allStallCheckbox.checked = allChecked;
-          if (!someChecked) allStallCheckbox.checked = true;
-          applyFilters();
+      sortOptionBtns.forEach((btn) => {
+        btn.addEventListener("click", function() {
+          setActiveSortBtn(this);
         });
       });
 
-      document.getElementById("resetStallFilter").addEventListener("click", function() {
-        stallCheckboxes.forEach(cb => cb.checked = cb.value === "all");
+      applyFilterBtn.addEventListener("click", function() {
         applyFilters();
+        closeFilterModal();
+      });
+
+      resetFilterBtn.addEventListener("click", function() {
+        setActiveSortBtn(document.querySelector('.sort-option-btn[data-sort="newest"]'));
+        applyFilters();
+        closeFilterModal();
       });
 
       const categoryBtns = document.querySelectorAll(".category-btn");
@@ -588,8 +559,6 @@ $conn->close();
         debounceTimer = setTimeout(() => applyFilters(), 300);
       });
 
-      const sortSelect = document.getElementById("sortSelect");
-
       function sortItems(items, sortBy) {
         const sorted = [...items];
         if (sortBy === "price_low") {
@@ -604,28 +573,22 @@ $conn->close();
         return sorted;
       }
 
-      sortSelect.addEventListener("change", function() {
-        updateSortSelectWidth();
-        applyFilters();
-      });
-
       function applyFilters() {
         const query = searchInput.value.toLowerCase().trim();
-        const selectedStalls = Array.from(stallCheckboxes)
-          .filter(cb => cb.checked && cb.value !== "all")
-          .map(cb => parseInt(cb.value));
-        const allStallsSelected = allStallCheckbox.checked && selectedStalls.length === 0;
-        const activeCategoryBtn = document.querySelector(".category-active-custom");
+        const activeCategoryBtn = document.querySelector(".category-btn.category-active-custom");
         const activeCategoryId = activeCategoryBtn ? activeCategoryBtn.getAttribute("data-cat-id") : "all";
+        const activeSortBtn = document.querySelector(".sort-option-btn.category-active-custom");
+        const sortValue = activeSortBtn ? activeSortBtn.getAttribute("data-sort") : "newest";
 
         const filtered = ALL_MENU_ITEMS.filter(item => {
-          const nameMatch = query === "" || item.item_name.toLowerCase().includes(query);
+          const nameMatch = query === "" ||
+            item.item_name.toLowerCase().includes(query) ||
+            item.stall_name.toLowerCase().includes(query);
           const categoryMatch = activeCategoryId === "all" || item.category_id === parseInt(activeCategoryId);
-          const stallMatch = allStallsSelected || selectedStalls.includes(item.stall_id);
-          return nameMatch && categoryMatch && stallMatch;
+          return nameMatch && categoryMatch;
         });
 
-        const sorted = sortItems(filtered, sortSelect.value);
+        const sorted = sortItems(filtered, sortValue);
 
         renderMenuItems(sorted);
 

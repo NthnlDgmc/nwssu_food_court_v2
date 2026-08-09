@@ -1,126 +1,350 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Payment success · check animation</title>
-  <!-- Tailwind via CDN + a touch of custom keyframes -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    /* custom pulse & check-draw for the "success" vibe */
-    @keyframes pop-in {
-      0% { transform: scale(0.6); opacity: 0; }
-      80% { transform: scale(1.05); opacity: 1; }
-      100% { transform: scale(1); opacity: 1; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Food Court Canteen — Menu</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        display: ['"Archivo Black"', 'sans-serif'],
+        body: ['Inter', 'sans-serif']
+      },
+      colors: {
+        char: '#211D1A',
+        char2: '#2C2622',
+        cream: '#FAF3E7',
+        saffron: '#E8A33D',
+        chili: '#D6482E',
+        sage: '#6E8F5C',
+        ink: '#3A2E22'
+      }
     }
-    @keyframes draw-check {
-      0% { stroke-dashoffset: 60; }
-      100% { stroke-dashoffset: 0; }
-    }
-    @keyframes ring-grow {
-      0% { stroke-dashoffset: 283; }
-      100% { stroke-dashoffset: 0; }
-    }
-    @keyframes soft-glow {
-      0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.3); }
-      70% { box-shadow: 0 0 0 20px rgba(34, 197, 94, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
-    }
-    .animate-pop-in {
-      animation: pop-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) forwards;
-    }
-    .animate-draw-check {
-      animation: draw-check 0.6s ease-out 0.3s forwards;
-    }
-    .animate-ring-grow {
-      animation: ring-grow 0.7s ease-out 0.1s forwards;
-    }
-    .animate-glow-pulse {
-      animation: soft-glow 1.2s ease-out 0.2s 2;
-    }
-    /* ring & check SVG helpers */
-    .ring-bg {
-      stroke: #e5e7eb; /* gray-200 */
-    }
-    .ring-progress {
-      stroke: #22c55e; /* green-500 */
-      stroke-linecap: round;
-      stroke-dasharray: 283; /* 2*pi*45 ≈ 282.74 */
-      stroke-dashoffset: 283;
-      transform: rotate(-90deg);
-      transform-origin: 50% 50%;
-    }
-    .check-path {
-      stroke-dasharray: 60;
-      stroke-dashoffset: 60;
-      stroke: #22c55e;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      fill: none;
-    }
-    .circle-bg {
-      fill: none;
-      stroke: #e5e7eb;
-    }
-    .success-ring {
-      fill: none;
-      stroke: #22c55e;
-      stroke-width: 5;
-    }
-  </style>
+  }
+}
+</script>
+<style>
+  body { font-family: 'Inter', sans-serif; }
+  .font-display { font-family: 'Archivo Black', sans-serif; }
+  ::-webkit-scrollbar { height: 6px; width: 6px; }
+  ::-webkit-scrollbar-thumb { background: #E8A33D; border-radius: 4px; }
+  .chip-active { background-color: #E8A33D; color: #211D1A; }
+  .ticket-notch {
+    background:
+      radial-gradient(circle 7px at 0 50%, transparent 98%, #FAF3E7 100%) left center,
+      radial-gradient(circle 7px at 100% 50%, transparent 98%, #FAF3E7 100%) right center;
+    background-repeat: no-repeat;
+  }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .fade-up { animation: fadeUp 0.35s ease both; }
+</style>
 </head>
-<body class="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-white p-4">
+<body class="bg-char text-cream min-h-screen font-body">
 
-  <div class="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-8 text-center transition-all hover:shadow-emerald-100/40 border border-emerald-100/30">
-
-    <!-- main animated icon -->
-    <div class="relative flex justify-center items-center mx-auto w-40 h-40 mb-4 animate-pop-in">
-      
-      <!-- outer ring with progress animation (SVG) -->
-      <svg class="absolute inset-0 w-full h-full" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <!-- background circle (gray) -->
-        <circle cx="60" cy="60" r="45" stroke="#e5e7eb" stroke-width="5" fill="none" />
-        <!-- animated progress ring -->
-        <circle cx="60" cy="60" r="45" stroke="#22c55e" stroke-width="5" 
-                stroke-linecap="round" stroke-dasharray="283" stroke-dashoffset="283"
-                class="animate-ring-grow" 
-                style="transform: rotate(-90deg); transform-origin: 50% 50%;" />
-      </svg>
-
-      <!-- inner checkmark SVG (draws after ring) -->
-      <svg class="absolute inset-0 w-full h-full" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M35 60 L52 77 L88 41" stroke="#22c55e" stroke-width="7" 
-              stroke-linecap="round" stroke-linejoin="round"
-              class="check-path animate-draw-check" />
-      </svg>
-
-      <!-- subtle glowing pulse behind the icon (CSS) -->
-      <div class="absolute inset-0 rounded-full animate-glow-pulse pointer-events-none"></div>
+<header class="sticky top-0 z-30 bg-char/95 backdrop-blur border-b border-white/10">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3">
+    <div class="flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-lg bg-saffron flex items-center justify-center shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="#211D1A" class="w-5 h-5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="font-display text-base sm:text-lg tracking-tight leading-none">FOOD<span class="text-saffron">HALL</span></h1>
+          <p class="text-[11px] text-cream/50 leading-none mt-1">Level 2 · Canteen Court</p>
+        </div>
+      </div>
+      <button id="cartBtn" class="relative w-10 h-10 rounded-full bg-char2 border border-white/10 flex items-center justify-center hover:border-saffron/60 transition">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="w-5 h-5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 1.807-4.804 2.104-7.398.075-.646-.437-1.202-1.09-1.202H5.106M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
+        </svg>
+        <span id="cartCount" class="absolute -top-1 -right-1 bg-chili text-cream text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">0</span>
+      </button>
     </div>
 
-    <!-- success text -->
-    <h2 class="text-3xl font-extrabold text-emerald-700 mt-2 tracking-tight">Payment successful</h2>
-    <p class="text-gray-500 text-sm font-medium mt-1.5">Your transaction has been verified</p>
-
-    <!-- mini receipt / details (just for demo) -->
-    <div class="mt-6 pt-5 border-t border-emerald-100/60 text-left text-sm text-gray-600 space-y-1.5">
-      <div class="flex justify-between"><span class="text-gray-400">Amount</span> <span class="font-semibold text-gray-800">$249.00</span></div>
-      <div class="flex justify-between"><span class="text-gray-400">Reference</span> <span class="font-mono text-gray-700 text-xs">#PAY-4D3C-9F2A</span></div>
-      <div class="flex justify-between"><span class="text-gray-400">Date</span> <span class="text-gray-700">Aug 5, 2026</span></div>
+    <div class="mt-3 flex items-center gap-2">
+      <div class="relative flex-1">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4.5 h-4.5 absolute left-3 top-1/2 -translate-y-1/2 text-cream/40">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+        </svg>
+        <input id="searchInput" type="text" placeholder="Search dish or stall..."
+          class="w-full bg-char2 border border-white/10 rounded-full pl-10 pr-9 py-2.5 text-sm placeholder:text-cream/35 focus:outline-none focus:border-saffron/70 focus:ring-2 focus:ring-saffron/20 transition">
+        <button id="clearSearch" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-cream/40 hover:text-cream">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <button id="filterToggle" class="relative shrink-0 w-10 h-10 sm:w-auto sm:px-4 rounded-full bg-char2 border border-white/10 flex items-center justify-center gap-1.5 hover:border-saffron/60 transition">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="w-4.5 h-4.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
+        </svg>
+        <span class="hidden sm:inline text-sm font-medium">Filters</span>
+        <span id="filterDot" class="hidden absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-chili"></span>
+      </button>
     </div>
 
-    <!-- "continue" button (optional) -->
-    <button class="mt-6 w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-md shadow-emerald-200 transition-all duration-200 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2">
-      Continue to dashboard
+    <div id="categoryRow" class="mt-3 flex gap-2 overflow-x-auto pb-1"></div>
+
+    <div id="filterPanel" class="hidden mt-3 p-4 rounded-2xl bg-char2 border border-white/10 fade-up">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-semibold text-cream/80">Price range</h3>
+        <button id="resetFilters" class="text-xs text-saffron hover:underline">Reset</button>
+      </div>
+      <div id="priceRow" class="flex flex-wrap gap-2 mb-4"></div>
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-semibold text-cream/80">Dietary</h3>
+      </div>
+      <div id="dietRow" class="flex flex-wrap gap-2"></div>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+  <div class="flex items-end justify-between mb-4">
+    <div>
+      <h2 class="font-display text-xl sm:text-2xl">TODAY'S MENU</h2>
+      <p id="resultCount" class="text-xs text-cream/45 mt-1">Loading dishes...</p>
+    </div>
+  </div>
+
+  <div id="menuGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4"></div>
+
+  <div id="emptyState" class="hidden flex-col items-center justify-center text-center py-20">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-14 h-14 text-cream/25 mb-3">
+      <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+    </svg>
+    <p class="font-display text-lg text-cream/70">NOTHING ON THE TRAY</p>
+    <p class="text-sm text-cream/40 mt-1">Try a different search or clear your filters.</p>
+    <button id="emptyReset" class="mt-4 px-5 py-2 rounded-full bg-saffron text-char font-semibold text-sm hover:bg-saffron/90 transition">Clear all filters</button>
+  </div>
+</main>
+
+<footer class="max-w-6xl mx-auto px-4 sm:px-6 pb-10 pt-4 text-center text-xs text-cream/30">
+  Prices in ₱ · Stalls open 7:00 AM – 8:00 PM
+</footer>
+
+<div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 bg-cream text-char px-5 py-3 rounded-full shadow-xl text-sm font-semibold z-50 fade-up"></div>
+
+<script>
+const foods = [
+  { id:1, name:"Sizzling Pork Sisig", stall:"Manong's Grill", category:"Rice Meals", price:135, veg:false, spicy:true, rating:4.7, color:"D6482E", tag:"Best Seller" },
+  { id:2, name:"Chicken Adobo Rice Bowl", stall:"Lola's Kitchen", category:"Rice Meals", price:110, veg:false, spicy:false, rating:4.5, color:"E8A33D", tag:"" },
+  { id:3, name:"Beef Pares", stall:"Manong's Grill", category:"Rice Meals", price:120, veg:false, spicy:false, rating:4.4, color:"6E8F5C", tag:"" },
+  { id:4, name:"Vegetable Pancit Canton", stall:"Wok This Way", category:"Noodles", price:95, veg:true, spicy:false, rating:4.3, color:"E8A33D", tag:"" },
+  { id:5, name:"Spicy Beef Ramen", stall:"Wok This Way", category:"Noodles", price:165, veg:false, spicy:true, rating:4.8, color:"D6482E", tag:"Best Seller" },
+  { id:6, name:"Sotanghon Guisado", stall:"Lola's Kitchen", category:"Noodles", price:85, veg:true, spicy:false, rating:4.1, color:"6E8F5C", tag:"" },
+  { id:7, name:"Grilled Pork Barbecue", stall:"Charcoal Corner", category:"Grilled", price:90, veg:false, spicy:false, rating:4.6, color:"E8A33D", tag:"" },
+  { id:8, name:"Inasal na Manok", stall:"Charcoal Corner", category:"Grilled", price:145, veg:false, spicy:false, rating:4.7, color:"D6482E", tag:"Best Seller" },
+  { id:9, name:"Grilled Bangus Belly", stall:"Charcoal Corner", category:"Grilled", price:160, veg:false, spicy:false, rating:4.2, color:"6E8F5C", tag:"" },
+  { id:10, name:"Cheesy Beef Nachos", stall:"Snack Shack", category:"Snacks", price:99, veg:false, spicy:false, rating:4.3, color:"E8A33D", tag:"" },
+  { id:11, name:"Loaded Fries", stall:"Snack Shack", category:"Snacks", price:79, veg:true, spicy:false, rating:4.0, color:"6E8F5C", tag:"" },
+  { id:12, name:"Spicy Chicken Wings", stall:"Snack Shack", category:"Snacks", price:110, veg:false, spicy:true, rating:4.5, color:"D6482E", tag:"" },
+  { id:13, name:"Mango Graham Float", stall:"Sweet Stop", category:"Desserts", price:65, veg:true, spicy:false, rating:4.6, color:"E8A33D", tag:"" },
+  { id:14, name:"Leche Flan Cup", stall:"Sweet Stop", category:"Desserts", price:55, veg:true, spicy:false, rating:4.4, color:"6E8F5C", tag:"" },
+  { id:15, name:"Halo-Halo Special", stall:"Sweet Stop", category:"Desserts", price:89, veg:true, spicy:false, rating:4.9, color:"D6482E", tag:"Best Seller" },
+  { id:16, name:"Iced Calamansi Juice", stall:"Thirsty Corner", category:"Drinks", price:45, veg:true, spicy:false, rating:4.2, color:"6E8F5C", tag:"" },
+  { id:17, name:"Fresh Buko Juice", stall:"Thirsty Corner", category:"Drinks", price:50, veg:true, spicy:false, rating:4.5, color:"E8A33D", tag:"" },
+  { id:18, name:"Iced Coffee Float", stall:"Thirsty Corner", category:"Drinks", price:75, veg:true, spicy:false, rating:4.3, color:"D6482E", tag:"" },
+  { id:19, name:"Tofu Sisig", stall:"Green Bowl", category:"Rice Meals", price:105, veg:true, spicy:true, rating:4.1, color:"6E8F5C", tag:"" },
+  { id:20, name:"Veggie Lumpia Plate", stall:"Green Bowl", category:"Snacks", price:70, veg:true, spicy:false, rating:4.0, color:"E8A33D", tag:"" }
+];
+
+const categories = ["All", ...new Set(foods.map(f => f.category))];
+const priceRanges = [
+  { label: "Under ₱80", min: 0, max: 79 },
+  { label: "₱80 – ₱120", min: 80, max: 120 },
+  { label: "₱121 – ₱160", min: 121, max: 160 },
+  { label: "Above ₱160", min: 161, max: Infinity }
+];
+
+let state = { search: "", category: "All", price: null, veg: false };
+
+const categoryRow = document.getElementById('categoryRow');
+const priceRow = document.getElementById('priceRow');
+const dietRow = document.getElementById('dietRow');
+const menuGrid = document.getElementById('menuGrid');
+const resultCount = document.getElementById('resultCount');
+const emptyState = document.getElementById('emptyState');
+const searchInput = document.getElementById('searchInput');
+const clearSearch = document.getElementById('clearSearch');
+const filterToggle = document.getElementById('filterToggle');
+const filterPanel = document.getElementById('filterPanel');
+const filterDot = document.getElementById('filterDot');
+let cartCount = 0;
+
+function starIcon(filled) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${filled ? '#E8A33D' : 'none'}" stroke="#E8A33D" stroke-width="1.5" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" /></svg>`;
+}
+
+function renderCategories() {
+  categoryRow.innerHTML = categories.map(cat => `
+    <button data-cat="${cat}" class="cat-btn shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border border-white/10 bg-char2 text-cream/70 transition ${cat === state.category ? 'chip-active' : ''}">
+      ${cat}
     </button>
+  `).join('');
+  categoryRow.querySelectorAll('.cat-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.category = btn.dataset.cat;
+      renderCategories();
+      renderMenu();
+    });
+  });
+}
 
-    <!-- tiny footnote: animation check (self-contained) -->
-    <p class="mt-4 text-[10px] text-gray-300 tracking-wider">✓ payment verified · secure</p>
-  </div>
+function renderPriceOptions() {
+  priceRow.innerHTML = priceRanges.map((r, i) => `
+    <button data-idx="${i}" class="price-btn px-3.5 py-1.5 rounded-full text-xs font-medium border border-white/10 bg-char text-cream/70 transition ${state.price === i ? 'chip-active' : ''}">
+      ${r.label}
+    </button>
+  `).join('');
+  priceRow.querySelectorAll('.price-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.idx);
+      state.price = state.price === idx ? null : idx;
+      renderPriceOptions();
+      updateFilterDot();
+      renderMenu();
+    });
+  });
+}
 
-  <!-- optional explanation (accessible) -->
-  <div class="absolute bottom-5 left-0 right-0 text-center text-xs text-gray-300/80 pointer-events-none">
-    <span>check animation · tailwind + css</span>
-  </div>
+function renderDietOptions() {
+  dietRow.innerHTML = `
+    <button id="vegBtn" class="px-3.5 py-1.5 rounded-full text-xs font-medium border border-white/10 bg-char text-cream/70 transition flex items-center gap-1.5 ${state.veg ? 'chip-active' : ''}">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+      Vegetarian only
+    </button>
+  `;
+  document.getElementById('vegBtn').addEventListener('click', () => {
+    state.veg = !state.veg;
+    renderDietOptions();
+    updateFilterDot();
+    renderMenu();
+  });
+}
+
+function updateFilterDot() {
+  const active = state.price !== null || state.veg;
+  filterDot.classList.toggle('hidden', !active);
+}
+
+function matchesFilters(item) {
+  const q = state.search.trim().toLowerCase();
+  const matchesSearch = !q || item.name.toLowerCase().includes(q) || item.stall.toLowerCase().includes(q);
+  const matchesCategory = state.category === "All" || item.category === state.category;
+  const matchesPrice = state.price === null || (item.price >= priceRanges[state.price].min && item.price <= priceRanges[state.price].max);
+  const matchesVeg = !state.veg || item.veg;
+  return matchesSearch && matchesCategory && matchesPrice && matchesVeg;
+}
+
+function card(item) {
+  return `
+  <div class="fade-up group rounded-2xl bg-char2 border border-white/10 overflow-hidden hover:border-saffron/50 hover:-translate-y-0.5 transition-all duration-200">
+    <div class="relative h-28 sm:h-32 overflow-hidden ticket-notch">
+      <img src="https://placehold.co/400x300/${item.color}/FAF3E7?text=${encodeURIComponent(item.name.split(' ').slice(0,2).join(' '))}&font=montserrat"
+           alt="${item.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+      ${item.tag ? `<span class="absolute top-2 left-2 bg-chili text-cream text-[10px] font-bold px-2 py-0.5 rounded-full">${item.tag}</span>` : ''}
+      ${item.veg ? `<span class="absolute top-2 right-2 bg-sage/90 w-5 h-5 rounded-full flex items-center justify-center" title="Vegetarian">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="#FAF3E7" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+      </span>` : ''}
+    </div>
+    <div class="p-3">
+      <div class="flex items-start justify-between gap-2">
+        <h3 class="font-semibold text-sm leading-snug text-cream">${item.name}</h3>
+        ${item.spicy ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#D6482E" class="w-4 h-4 shrink-0 mt-0.5"><path d="M12 2C10 5 8 8 8 11a4 4 0 0 0 8 0c0-3-2-6-4-9z"/></svg>` : ''}
+      </div>
+      <p class="text-xs text-cream/45 mt-0.5 flex items-center gap-1">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" /></svg>
+        ${item.stall}
+      </p>
+      <div class="flex items-center gap-0.5 mt-1.5">
+        ${[1,2,3,4,5].map(n => starIcon(n <= Math.round(item.rating))).join('')}
+        <span class="text-[11px] text-cream/40 ml-1">${item.rating}</span>
+      </div>
+      <div class="flex items-center justify-between mt-2.5">
+        <span class="font-display text-saffron text-sm">₱${item.price}</span>
+        <button data-add="${item.id}" class="add-btn w-8 h-8 rounded-full bg-saffron text-char flex items-center justify-center hover:bg-cream transition active:scale-90">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderMenu() {
+  const filtered = foods.filter(matchesFilters);
+  resultCount.textContent = `${filtered.length} dish${filtered.length !== 1 ? 'es' : ''} available`;
+  if (filtered.length === 0) {
+    menuGrid.classList.add('hidden');
+    emptyState.classList.remove('hidden');
+    emptyState.classList.add('flex');
+  } else {
+    menuGrid.classList.remove('hidden');
+    emptyState.classList.add('hidden');
+    emptyState.classList.remove('flex');
+    menuGrid.innerHTML = filtered.map(card).join('');
+    menuGrid.querySelectorAll('.add-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        cartCount++;
+        document.getElementById('cartCount').textContent = cartCount;
+        const item = foods.find(f => f.id === Number(btn.dataset.add));
+        showToast(`${item.name} added to tray`);
+      });
+    });
+  }
+}
+
+let toastTimer;
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.add('hidden'), 1800);
+}
+
+searchInput.addEventListener('input', () => {
+  state.search = searchInput.value;
+  clearSearch.classList.toggle('hidden', !state.search);
+  renderMenu();
+});
+clearSearch.addEventListener('click', () => {
+  searchInput.value = '';
+  state.search = '';
+  clearSearch.classList.add('hidden');
+  renderMenu();
+});
+filterToggle.addEventListener('click', () => filterPanel.classList.toggle('hidden'));
+document.getElementById('resetFilters').addEventListener('click', () => {
+  state.price = null;
+  state.veg = false;
+  renderPriceOptions();
+  renderDietOptions();
+  updateFilterDot();
+  renderMenu();
+});
+document.getElementById('emptyReset').addEventListener('click', () => {
+  state = { search: "", category: "All", price: null, veg: false };
+  searchInput.value = '';
+  clearSearch.classList.add('hidden');
+  renderCategories();
+  renderPriceOptions();
+  renderDietOptions();
+  updateFilterDot();
+  renderMenu();
+});
+
+renderCategories();
+renderPriceOptions();
+renderDietOptions();
+renderMenu();
+</script>
 </body>
 </html>

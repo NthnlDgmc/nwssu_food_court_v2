@@ -149,7 +149,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         exit;
     }
 
-    echo json_encode(['success' => true]);
+    $stmt = $conn->prepare("SELECT quantity FROM carts WHERE customer_id = ? AND menu_item_id = ? LIMIT 1");
+    $stmt->bind_param("ii", $customerId, $menuItemId);
+    $stmt->execute();
+    $cartRow = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    $newQuantity = $cartRow ? (int) $cartRow['quantity'] : 1;
+
+    echo json_encode(['success' => true, 'quantity' => $newQuantity]);
     $conn->close();
     exit;
 }
@@ -225,7 +233,7 @@ $avatarInitial = mb_strtoupper(mb_substr($firstName, 0, 1));
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Norwesso Eats" />
-    <link rel="apple-touch-icon" href="../assets/images/icon-192.png" />
+    <link rel="apple-touch-icon" href="/assets/images/icon-192.png" />
     <link href="../assets/css/tailwind.css" rel="stylesheet" />
     <style>
         @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
@@ -439,6 +447,15 @@ $avatarInitial = mb_strtoupper(mb_substr($firstName, 0, 1));
         </div>
     </div>
 
+    <div
+        id="toast"
+        class="hidden items-center gap-2 fixed left-1/2 bottom-6 z-40 -translate-x-1/2 max-w-[calc(100%-2rem)] bg-gray-900 text-white text-xs font-medium px-4 py-2.5 shadow-lg rounded-[6px]">
+        <svg id="toastIconSvg" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-emerald-400 shrink-0">
+            <path id="toastIconPath" stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+        </svg>
+        <span id="toastMessage" class="truncate"></span>
+    </div>
+
     <script>
         let favoriteItems = <?php echo json_encode($favoriteItems); ?>;
 
@@ -469,6 +486,36 @@ $avatarInitial = mb_strtoupper(mb_substr($firstName, 0, 1));
                 .replace(/>/g, "&gt;")
                 .replace(/"/g, "&quot;")
                 .replace(/'/g, "&#039;");
+        }
+
+        let toastHideTimeout;
+
+        function showToast(message, type = "success") {
+            const toast = document.getElementById("toast");
+            const toastMessage = document.getElementById("toastMessage");
+            const iconSvg = document.getElementById("toastIconSvg");
+            const iconPath = document.getElementById("toastIconPath");
+            toastMessage.textContent = message;
+
+            if (type === "warning") {
+                iconSvg.classList.remove("text-emerald-400");
+                iconSvg.classList.add("text-amber-400");
+                iconPath.setAttribute("d", "M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z");
+            } else {
+                iconSvg.classList.remove("text-amber-400");
+                iconSvg.classList.add("text-emerald-400");
+                iconPath.setAttribute("d", "M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z");
+            }
+
+            if (toastHideTimeout) clearTimeout(toastHideTimeout);
+
+            toast.classList.remove("hidden");
+            toast.classList.add("flex");
+
+            toastHideTimeout = setTimeout(() => {
+                toast.classList.add("hidden");
+                toast.classList.remove("flex");
+            }, 2000);
         }
 
         async function postAction(action, data = {}) {
@@ -528,12 +575,15 @@ $avatarInitial = mb_strtoupper(mb_substr($firstName, 0, 1));
 
                     const menuItemId = parseInt(this.getAttribute("data-item-id"));
                     const card = grid.querySelector(`[data-card-id="${menuItemId}"]`);
+                    const item = favoriteItems.find((i) => i.menu_item_id === menuItemId);
+                    const itemLabel = item ? item.item_name : "Item";
 
                     const res = await postAction("toggle_favorite", {
                         menu_item_id: menuItemId
                     });
 
                     if (res.success) {
+                        showToast(itemLabel + " removed from favorites");
                         if (card) {
                             card.classList.add("card-removing");
                             setTimeout(() => {
@@ -543,6 +593,7 @@ $avatarInitial = mb_strtoupper(mb_substr($firstName, 0, 1));
                         }
                     } else {
                         this.disabled = false;
+                        showToast(res.message || "Something went wrong. Please try again.", "warning");
                     }
                 });
             });
@@ -553,12 +604,16 @@ $avatarInitial = mb_strtoupper(mb_substr($firstName, 0, 1));
                     this.disabled = true;
 
                     const menuItemId = this.getAttribute("data-item-id");
+                    const item = favoriteItems.find((i) => i.menu_item_id === parseInt(menuItemId));
+                    const itemLabel = item ? item.item_name : "Item";
 
                     const res = await postAction("add_to_cart", {
                         menu_item_id: menuItemId
                     });
 
                     if (res.success) {
+                        const qtyText = res.quantity && res.quantity > 1 ? ` (${res.quantity}x)` : "";
+                        showToast(itemLabel + " added to cart" + qtyText);
                         this.classList.add("added-state");
                         this.innerHTML = ADD_BTN_ADDED_HTML;
                         setTimeout(() => {
@@ -568,6 +623,7 @@ $avatarInitial = mb_strtoupper(mb_substr($firstName, 0, 1));
                         }, 1500);
                     } else {
                         this.disabled = false;
+                        showToast(res.message || "Something went wrong. Please try again.", "warning");
                     }
                 });
             });
@@ -625,6 +681,9 @@ $avatarInitial = mb_strtoupper(mb_substr($firstName, 0, 1));
                     favoriteItems = [];
                     renderFavorites();
                     closeClearFavoritesModal();
+                    showToast("Favorites cleared");
+                } else {
+                    showToast(res.message || "Something went wrong. Please try again.", "warning");
                 }
             });
         }

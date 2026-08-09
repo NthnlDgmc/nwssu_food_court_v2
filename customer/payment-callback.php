@@ -456,6 +456,13 @@ $conn->close();
       </div>
     <?php endif; ?>
   </div>
+  <?php if ($outcome === 'success'): ?>
+  <script>
+    localStorage.removeItem("cart_orderType");
+    localStorage.removeItem("cart_location");
+    localStorage.removeItem("cart_paymentMethod");
+  </script>
+  <?php endif; ?>
 </body>
 
 </html>
