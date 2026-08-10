@@ -1308,10 +1308,50 @@ $avatarInitial = mb_strtoupper(mb_substr($firstName, 0, 1));
       });
     }
 
+    function setupRotatingPlaceholder() {
+      const searchInput = document.getElementById("searchInput");
+      const defaultPlaceholder = "Search foods or stalls...";
+
+      const uniqueNames = [...new Set(ALL_MENU_ITEMS.map((item) => item.item_name))];
+      const shuffled = uniqueNames.sort(() => Math.random() - 0.5);
+      const samples = shuffled.slice(0, 5);
+
+      const placeholders = [defaultPlaceholder, ...samples.map((name) => `Search for "${name}"...`)];
+
+      let currentIndex = 0;
+      let rotateInterval = null;
+
+      function rotate() {
+        currentIndex++;
+        if (currentIndex >= placeholders.length) {
+          searchInput.placeholder = defaultPlaceholder;
+          stopRotating();
+          return;
+        }
+        searchInput.placeholder = placeholders[currentIndex];
+      }
+
+      function startRotating() {
+        if (rotateInterval || placeholders.length <= 1) return;
+        rotateInterval = setInterval(rotate, 3000);
+      }
+
+      function stopRotating() {
+        clearInterval(rotateInterval);
+        rotateInterval = null;
+      }
+
+      searchInput.addEventListener("focus", stopRotating);
+      searchInput.addEventListener("input", stopRotating);
+
+      startRotating();
+    }
+
     function initializeEventListeners() {
       setupFilterModal();
       setupCategoryFilter();
       setupSearch();
+      setupRotatingPlaceholder();
       setupLoadMore();
       applyFilters();
     }

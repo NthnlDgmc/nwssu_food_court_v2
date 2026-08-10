@@ -657,7 +657,7 @@ $conn->close();
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Norwesso Eats" />
   <link rel="apple-touch-icon" href="/assets/images/icon-192.png" />
-  <link href="/assets/css/tailwind.css" rel="stylesheet" />
+  <link href="../assets/css/tailwind.css" rel="stylesheet" />
   <style>
     @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
 
