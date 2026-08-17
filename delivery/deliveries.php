@@ -148,7 +148,7 @@ function fetchDeliveriesData($conn, $staffId)
   $orderIds = [];
 
   while ($row = $result->fetch_assoc()) {
-    $orderIdRaw = (int) $row['order_id'];
+    $orderIdRaw = (string) $row['order_id'];
     $orderIds[] = $orderIdRaw;
 
     $stallOwner = null;
@@ -162,7 +162,7 @@ function fetchDeliveriesData($conn, $staffId)
 
     $orders[$orderIdRaw] = [
       'orderIdRaw' => $orderIdRaw,
-      'id' => 'ORD-' . date('Y', strtotime($row['created_at'])) . '-' . str_pad($orderIdRaw, 6, '0', STR_PAD_LEFT),
+      'id' => $orderIdRaw,
       'date' => date('M j, Y', strtotime($row['created_at'])) . ' · ' . date('g:i A', strtotime($row['created_at'])),
       'time' => formatRelativeTime($row['created_at']),
       'customerName' => trim($row['cust_first_name'] . ' ' . $row['cust_last_name']),
@@ -182,7 +182,6 @@ function fetchDeliveriesData($conn, $staffId)
       'note' => $row['note'],
       'cancelReason' => $row['cancel_reason'],
       'deliveryFee' => (float) $row['total_delivery_fee'],
-      'deliveryFee' => (float) $row['total_delivery_fee'],
       'grandTotal' => (float) $row['grand_total'],
       'items' => [],
     ];
@@ -194,7 +193,7 @@ function fetchDeliveriesData($conn, $staffId)
   }
 
   $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
-  $types = str_repeat('i', count($orderIds));
+  $types = str_repeat('s', count($orderIds));
 
   $itemsStmt = $conn->prepare("
         SELECT oi.order_id, oi.item_name, oi.unit_price, oi.quantity, mi.image
@@ -209,7 +208,7 @@ function fetchDeliveriesData($conn, $staffId)
   $itemsResult = $itemsStmt->get_result();
 
   while ($itemRow = $itemsResult->fetch_assoc()) {
-    $oid = (int) $itemRow['order_id'];
+    $oid = (string) $itemRow['order_id'];
     if (isset($orders[$oid])) {
       $orders[$oid]['items'][] = [
         'name' => $itemRow['item_name'],
@@ -235,16 +234,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
   }
 
   if ($action === 'accept_delivery') {
-    $orderId = (int) ($_POST['order_id'] ?? 0);
+    $orderId = trim((string) ($_POST['order_id'] ?? ''));
 
-    if ($orderId <= 0) {
+    if ($orderId === '') {
       echo json_encode(['success' => false, 'message' => 'Invalid order.']);
       $conn->close();
       exit;
     }
 
     $stmt = $conn->prepare("SELECT status, staff_id, order_type FROM orders WHERE order_id = ? LIMIT 1");
-    $stmt->bind_param("i", $orderId);
+    $stmt->bind_param("s", $orderId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
@@ -262,7 +261,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     $stmt = $conn->prepare("UPDATE orders SET staff_id = ? WHERE order_id = ? AND staff_id IS NULL");
-    $stmt->bind_param("si", $staffId, $orderId);
+    $stmt->bind_param("is", $staffId, $orderId);
     $ok = $stmt->execute();
     $stmt->close();
 
@@ -274,16 +273,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
   }
 
   if ($action === 'mark_collected') {
-    $orderId = (int) ($_POST['order_id'] ?? 0);
+    $orderId = trim((string) ($_POST['order_id'] ?? ''));
 
-    if ($orderId <= 0) {
+    if ($orderId === '') {
       echo json_encode(['success' => false, 'message' => 'Invalid order.']);
       $conn->close();
       exit;
     }
 
     $stmt = $conn->prepare("SELECT status, staff_id, customer_id, owner_id, created_at FROM orders WHERE order_id = ? AND order_type = 'delivery' LIMIT 1");
-    $stmt->bind_param("i", $orderId);
+    $stmt->bind_param("s", $orderId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
@@ -301,12 +300,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     $stmt = $conn->prepare("UPDATE orders SET status = 'collected' WHERE order_id = ? AND staff_id = ?");
-    $stmt->bind_param("is", $orderId, $staffId);
+    $stmt->bind_param("si", $orderId, $staffId);
     $ok = $stmt->execute();
     $stmt->close();
 
     if ($ok) {
-      $friendlyOrderId = 'ORD-' . date('Y', strtotime($row['created_at'])) . '-' . str_pad($orderId, 6, '0', STR_PAD_LEFT);
+      $friendlyOrderId = $orderId;
       createNotification(
         $conn,
         'customer',
@@ -336,16 +335,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
   }
 
   if ($action === 'mark_out_for_delivery') {
-    $orderId = (int) ($_POST['order_id'] ?? 0);
+    $orderId = trim((string) ($_POST['order_id'] ?? ''));
 
-    if ($orderId <= 0) {
+    if ($orderId === '') {
       echo json_encode(['success' => false, 'message' => 'Invalid order.']);
       $conn->close();
       exit;
     }
 
     $stmt = $conn->prepare("SELECT status, staff_id, customer_id, created_at FROM orders WHERE order_id = ? AND order_type = 'delivery' LIMIT 1");
-    $stmt->bind_param("i", $orderId);
+    $stmt->bind_param("s", $orderId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
@@ -363,12 +362,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     $stmt = $conn->prepare("UPDATE orders SET status = 'out_for_delivery' WHERE order_id = ? AND staff_id = ?");
-    $stmt->bind_param("is", $orderId, $staffId);
+    $stmt->bind_param("si", $orderId, $staffId);
     $ok = $stmt->execute();
     $stmt->close();
 
     if ($ok) {
-      $friendlyOrderId = 'ORD-' . date('Y', strtotime($row['created_at'])) . '-' . str_pad($orderId, 6, '0', STR_PAD_LEFT);
+      $friendlyOrderId = $orderId;
       createNotification(
         $conn,
         'customer',
@@ -387,10 +386,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
   }
 
   if ($action === 'mark_delivered') {
-    $orderId = (int) ($_POST['order_id'] ?? 0);
+    $orderId = trim((string) ($_POST['order_id'] ?? ''));
     $photoData = $_POST['photo_data'] ?? '';
 
-    if ($orderId <= 0) {
+    if ($orderId === '') {
       echo json_encode(['success' => false, 'message' => 'Invalid order.']);
       $conn->close();
       exit;
@@ -403,7 +402,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     $stmt = $conn->prepare("SELECT status, staff_id, customer_id, owner_id, created_at, payment_method FROM orders WHERE order_id = ? AND order_type = 'delivery' LIMIT 1");
-    $stmt->bind_param("i", $orderId);
+    $stmt->bind_param("s", $orderId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
@@ -432,12 +431,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     } else {
       $stmt = $conn->prepare("UPDATE orders SET status = 'delivered', delivery_proof_image = ?, proof_captured_at = NOW(), customer_confirmed = 'pending' WHERE order_id = ? AND staff_id = ?");
     }
-    $stmt->bind_param("sis", $proofImage, $orderId, $staffId);
+    $stmt->bind_param("ssi", $proofImage, $orderId, $staffId);
     $ok = $stmt->execute();
     $stmt->close();
 
     if ($ok) {
-      $friendlyOrderId = 'ORD-' . date('Y', strtotime($row['created_at'])) . '-' . str_pad($orderId, 6, '0', STR_PAD_LEFT);
+      $friendlyOrderId = $orderId;
       createNotification(
         $conn,
         'customer',
@@ -467,17 +466,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
   }
 
   if ($action === 'cancel_delivery') {
-    $orderId = (int) ($_POST['order_id'] ?? 0);
+    $orderId = trim((string) ($_POST['order_id'] ?? ''));
     $reason = trim($_POST['reason'] ?? '');
 
-    if ($orderId <= 0 || $reason === '') {
+    if ($orderId === '' || $reason === '') {
       echo json_encode(['success' => false, 'message' => 'Please provide a reason for cancelling this delivery.']);
       $conn->close();
       exit;
     }
 
     $stmt = $conn->prepare("SELECT status, staff_id, customer_id, owner_id, created_at FROM orders WHERE order_id = ? AND order_type = 'delivery' LIMIT 1");
-    $stmt->bind_param("i", $orderId);
+    $stmt->bind_param("s", $orderId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
@@ -495,12 +494,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     $stmt = $conn->prepare("UPDATE orders SET status = 'cancelled', cancel_reason = ?, cancelled_at = NOW() WHERE order_id = ? AND staff_id = ?");
-    $stmt->bind_param("sis", $reason, $orderId, $staffId);
+    $stmt->bind_param("ssi", $reason, $orderId, $staffId);
     $ok = $stmt->execute();
     $stmt->close();
 
     if ($ok) {
-      $friendlyOrderId = 'ORD-' . date('Y', strtotime($row['created_at'])) . '-' . str_pad($orderId, 6, '0', STR_PAD_LEFT);
+      $friendlyOrderId = $orderId;
       createNotification(
         $conn,
         'customer',
@@ -1539,7 +1538,7 @@ sort($stallOptions);
 
     function bindEvents() {
       document.querySelectorAll(".view-details-btn").forEach((btn) => {
-        btn.addEventListener("click", () => showDeliveryDetails(parseInt(btn.getAttribute("data-id"))));
+        btn.addEventListener("click", () => showDeliveryDetails(btn.getAttribute("data-id")));
       });
 
       document.querySelectorAll(".copy-id-btn").forEach((btn) => {
@@ -1551,23 +1550,23 @@ sort($stallOptions);
       });
 
       document.querySelectorAll(".accept-btn").forEach((btn) => {
-        btn.addEventListener("click", () => openAcceptModal(parseInt(btn.getAttribute("data-id"))));
+        btn.addEventListener("click", () => openAcceptModal(btn.getAttribute("data-id")));
       });
 
       document.querySelectorAll(".collected-btn").forEach((btn) => {
-        btn.addEventListener("click", () => openCollectedModal(parseInt(btn.getAttribute("data-id"))));
+        btn.addEventListener("click", () => openCollectedModal(btn.getAttribute("data-id")));
       });
 
       document.querySelectorAll(".start-delivery-btn").forEach((btn) => {
-        btn.addEventListener("click", () => openStartDeliveryModal(parseInt(btn.getAttribute("data-id"))));
+        btn.addEventListener("click", () => openStartDeliveryModal(btn.getAttribute("data-id")));
       });
 
       document.querySelectorAll(".mark-delivered-btn").forEach((btn) => {
-        btn.addEventListener("click", () => openDeliverProofModal(parseInt(btn.getAttribute("data-id"))));
+        btn.addEventListener("click", () => openDeliverProofModal(btn.getAttribute("data-id")));
       });
 
       document.querySelectorAll(".cancel-delivery-btn").forEach((btn) => {
-        btn.addEventListener("click", () => openCancelDeliveryModal(parseInt(btn.getAttribute("data-id"))));
+        btn.addEventListener("click", () => openCancelDeliveryModal(btn.getAttribute("data-id")));
       });
     }
 

@@ -96,6 +96,18 @@ function refValues($arr)
   return $refs;
 }
 
+function generateOrderId()
+{
+  $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  $random = '';
+
+  for ($i = 0; $i < 8; $i++) {
+    $random .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+  }
+
+  return 'ORD-' . date('Y') . '-' . $random;
+}
+
 function createPaymongoSource($amount, $type, $successUrl, $failedUrl, $billingName = '', $billingEmail = '')
 {
   $amountInCentavos = (int) round($amount * 100);
@@ -258,7 +270,7 @@ function fetchCartData($conn, $customerId)
 {
   $stmt = $conn->prepare("
         SELECT c.cart_id, c.quantity, c.note,
-               mi.menu_item_id, mi.item_name, mi.price, mi.image,
+               mi.menu_item_id, mi.item_name, mi.price, mi.image, mi.status AS item_status,
                s.stall_id, s.stall_name,
                COALESCE(so.delivery_fee, 0.00) AS delivery_fee
         FROM carts c
@@ -281,6 +293,7 @@ function fetchCartData($conn, $customerId)
       'item_name'          => $row['item_name'],
       'price'              => (float) $row['price'],
       'image'              => $row['image'] ? '../' . $row['image'] : null,
+      'is_available'       => $row['item_status'] === 'available',
       'stall_id'           => (int) $row['stall_id'],
       'stall_name'         => $row['stall_name'],
       'stall_delivery_fee' => (float) $row['delivery_fee'],
@@ -431,7 +444,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     $stmt = $conn->prepare("
             SELECT c.cart_id, c.menu_item_id, c.stall_id, c.quantity, c.note,
-                   mi.item_name, mi.price,
+                   mi.item_name, mi.price, mi.status AS item_status,
                    s.owner_id, s.staff_id,
                    COALESCE(so.delivery_fee, 0.00) AS delivery_fee
             FROM carts c
@@ -446,7 +459,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $result = $stmt->get_result();
 
     $groups = [];
+    $hasUnavailableItem = false;
     while ($row = $result->fetch_assoc()) {
+      if ($row['item_status'] !== 'available') {
+        $hasUnavailableItem = true;
+        continue;
+      }
       $sid = (int) $row['stall_id'];
       if (!isset($groups[$sid])) {
         $groups[$sid] = [
@@ -467,6 +485,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       $groups[$sid]['cart_ids'][] = (int) $row['cart_id'];
     }
     $stmt->close();
+
+    if ($hasUnavailableItem) {
+      echo json_encode(['success' => false, 'message' => 'Remove out of stock items first']);
+      $conn->close();
+      exit;
+    }
 
     if (empty($groups)) {
       echo json_encode(['success' => false, 'message' => 'Your cart is empty.']);
@@ -582,17 +606,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       $note = $group['note'];
       $staffId = $orderType === 'delivery' ? $group['staff_id'] : null;
 
+      $newOrderId = generateOrderId();
+      $ownerId = $group['owner_id'];
+
       $stmt = $conn->prepare("
                 INSERT INTO orders
-                    (customer_id, stall_id, owner_id, staff_id, order_type, status, payment_method,
+                    (order_id, customer_id, stall_id, owner_id, staff_id, order_type, status, payment_method,
                      total_amount, total_delivery_fee, grand_total, drop_off_location, note)
-                VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)
             ");
       $stmt->bind_param(
-        "iiiissdddss",
+        "siiiissdddss",
+        $newOrderId,
         $customerId,
         $stallId,
-        $group['owner_id'],
+        $ownerId,
         $staffId,
         $orderType,
         $paymentMethod,
@@ -603,19 +631,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $note
       );
       $stmt->execute();
-      $newOrderId = $stmt->insert_id;
       $stmt->close();
 
       $createdOrderIds[] = $newOrderId;
 
-      if ($group['owner_id'] !== null) {
-        $friendlyOrderId = 'ORD-' . date('Y') . '-' . str_pad($newOrderId, 6, '0', STR_PAD_LEFT);
+      if ($ownerId !== null) {
         createNotification(
           $conn,
           'stall_owner',
-          $group['owner_id'],
+          $ownerId,
           'New Order Received',
-          $customerFullName . ' placed order ' . $friendlyOrderId . ' worth ₱' . number_format($grandTotal, 2) . '.',
+          $customerFullName . ' placed order ' . $newOrderId . ' worth ₱' . number_format($grandTotal, 2) . '.',
           '../stall/orders.php'
         );
       }
@@ -624,17 +650,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 INSERT INTO order_items (order_id, menu_item_id, item_name, unit_price, quantity)
                 VALUES (?, ?, ?, ?, ?)
             ");
-      foreach ($group['items'] as $item) {
+            foreach ($group['items'] as $item) {
+        $menuItemId = $item['menu_item_id'];
+        $itemName = $item['item_name'];
+        $itemPrice = $item['price'];
+        $itemQuantity = $item['quantity'];
+
         $itemStmt->bind_param(
-          "iisdi",
+          "sisdi",
           $newOrderId,
-          $item['menu_item_id'],
-          $item['item_name'],
-          $item['price'],
-          $item['quantity']
+          $menuItemId,
+          $itemName,
+          $itemPrice,
+          $itemQuantity
         );
         $itemStmt->execute();
       }
+
       $itemStmt->close();
 
       foreach ($group['cart_ids'] as $cid) {
@@ -652,14 +684,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       $deleteStmt->close();
     }
 
-    $friendlyIds = array_map(function ($id) {
-      return 'ORD-' . date('Y') . '-' . str_pad($id, 6, '0', STR_PAD_LEFT);
-    }, $createdOrderIds);
-
-    echo json_encode([
+        echo json_encode([
       'success' => true,
       'order_count' => count($createdOrderIds),
-      'order_ids' => $friendlyIds,
+      'order_ids' => $createdOrderIds,
+
       'total' => $cashOverallTotal,
     ]);
     $conn->close();
@@ -1538,11 +1567,12 @@ $conn->close();
     }
 
     function calculateTotals() {
-      const subtotal = cartItems.reduce(
+      const availableItems = cartItems.filter((item) => item.is_available);
+      const subtotal = availableItems.reduce(
         (sum, item) => sum + item.price * item.quantity,
         0
       );
-      const groups = groupItemsByStall(cartItems);
+      const groups = groupItemsByStall(availableItems);
       const stallFees = Object.values(groups).map((g) => ({
         stallName: g.stallName,
         fee: g.deliveryFee,
@@ -1764,21 +1794,21 @@ $conn->close();
         const itemsHTML = stallData.items
           .map(
             (item) => `
-            <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 last:border-b-0">
-              ${
-                item.image
-                  ? `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.item_name)}" class="w-10 h-10 object-cover bg-gray-100 shrink-0 rounded-[3px] item-image-fade" loading="lazy" onload="this.classList.add('loaded')" />`
-                  : `<div class="w-10 h-10 bg-gray-100 shrink-0 rounded-[3px]"></div>`
-              }
+            <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 last:border-b-0 ${item.is_available ? "" : "opacity-50"}">
+              <img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.item_name)}" class="w-10 h-10 object-cover bg-gray-100 shrink-0 rounded-[3px] item-image-fade" loading="lazy" onload="this.classList.add('loaded')" />
               <div class="flex-1 flex items-center gap-2 min-w-0">
                 <div class="flex flex-col flex-1 min-w-0">
                   <span class="text-xs text-gray-600 truncate">${escapeHtml(item.item_name)}</span>
-                  <span class="text-[10px] text-gray-400">&#8369;${item.price.toFixed(2)} each</span>
+                  ${
+                    item.is_available
+                      ? `<span class="text-[10px] text-gray-400">&#8369;${item.price.toFixed(2)} each</span>`
+                      : `<span class="text-[10px] text-red-500 font-semibold">Out of Stock</span>`
+                  }
                 </div>
                 <div class="flex items-center gap-0.5 shrink-0">
-                  <button class="decrement-qty w-6 h-6 flex items-center justify-center border border-gray-300 text-gray-500 hover:border-emerald-500 hover:text-emerald-600 transition-colors text-xs font-bold leading-none rounded-[3px]" data-cart-id="${item.cart_id}" data-qty="${item.quantity}">&#8722;</button>
-                  <input type="number" class="qty-input w-7 text-center text-xs font-semibold text-gray-800 bg-transparent border-none focus:outline-none p-0 block" value="${item.quantity}" min="1" data-cart-id="${item.cart_id}" />
-                  <button class="increment-qty w-6 h-6 flex items-center justify-center border border-gray-300 text-gray-500 hover:border-emerald-500 hover:text-emerald-600 transition-colors text-xs font-bold leading-none rounded-[3px]" data-cart-id="${item.cart_id}" data-qty="${item.quantity}">+</button>
+                  <button class="decrement-qty w-6 h-6 flex items-center justify-center border border-gray-300 text-gray-500 hover:border-emerald-500 hover:text-emerald-600 transition-colors text-xs font-bold leading-none rounded-[3px] disabled:opacity-40 disabled:cursor-not-allowed" data-cart-id="${item.cart_id}" data-qty="${item.quantity}" ${item.is_available ? "" : "disabled"}>&#8722;</button>
+                  <input type="number" class="qty-input w-7 text-center text-xs font-semibold text-gray-800 bg-transparent border-none focus:outline-none p-0 block" value="${item.quantity}" min="1" data-cart-id="${item.cart_id}" ${item.is_available ? "" : "disabled"} />
+                  <button class="increment-qty w-6 h-6 flex items-center justify-center border border-gray-300 text-gray-500 hover:border-emerald-500 hover:text-emerald-600 transition-colors text-xs font-bold leading-none rounded-[3px] disabled:opacity-40 disabled:cursor-not-allowed" data-cart-id="${item.cart_id}" data-qty="${item.quantity}" ${item.is_available ? "" : "disabled"}>+</button>
                 </div>
                 <span class="text-xs font-medium text-gray-700 shrink-0 w-14 text-right">&#8369;${(item.price * item.quantity).toFixed(2)}</span>
                 <button class="remove-item-btn p-1 text-gray-300 hover:text-red-500 transition-colors shrink-0" data-cart-id="${item.cart_id}" title="Remove item">
@@ -2026,6 +2056,11 @@ $conn->close();
             return;
           }
           if (cartItems.length === 0) return;
+
+          if (cartItems.some((item) => !item.is_available)) {
+            showToast("Remove out of stock items first", "warning");
+            return;
+          }
 
           const paymentMethod = document.querySelector(
             "input[name='paymentMethod']:checked",

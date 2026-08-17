@@ -28,8 +28,11 @@ if ($orderCount < 1) {
   $orderCount = 1;
 }
 
-$orderIdsParam = $_GET['ids'] ?? '';
-$displayOrderId = $orderIdsParam !== '' ? implode(', ', explode(',', $orderIdsParam)) : '—';
+$orderIdsParam = (string) ($_GET['ids'] ?? '');
+$orderIds = array_values(array_filter(array_map('trim', explode(',', $orderIdsParam)), function ($orderId) {
+  return preg_match('/^ORD-[0-9]{4}-[A-Z0-9]{8}$/', $orderId) === 1;
+}));
+$displayOrderId = !empty($orderIds) ? implode(', ', $orderIds) : '—';
 
 $displayAmount = (float) ($_GET['total'] ?? 0);
 ?>
@@ -89,7 +92,7 @@ $displayAmount = (float) ($_GET['total'] ?? 0);
         </span>
         <div class="min-w-0">
           <p class="text-[10px] text-gray-400"><?php echo $orderCount > 1 ? 'Order IDs' : 'Order ID'; ?></p>
-          <p class="text-xs font-medium text-gray-800 truncate"><?php echo htmlspecialchars($displayOrderId); ?></p>
+          <p class="text-xs font-medium text-gray-800 truncate"><?php echo htmlspecialchars($displayOrderId, ENT_QUOTES, 'UTF-8'); ?></p>
         </div>
       </div>
 

@@ -488,6 +488,22 @@ if (!$initialProfile) {
               </svg>
             </button>
             <button
+              id="installAppBtn"
+              class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">
+              <span class="w-8 h-8 bg-gray-100 flex items-center justify-center shrink-0 rounded-[3px]">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M7.5 10.5 12 15m0 0 4.5-4.5M12 15V3" />
+                </svg>
+              </span>
+              <span class="flex-1 min-w-0 text-left">
+                <span class="block text-xs font-medium text-gray-700">Install App</span>
+                <span id="installAppStatus" class="block text-[10px] text-gray-400 mt-0.5">Checking availability...</span>
+              </span>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-300 shrink-0">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+              </svg>
+            </button>
+            <button
               id="termsPrivacyBtn"
               class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">
               <span class="w-8 h-8 bg-gray-100 flex items-center justify-center shrink-0 rounded-[3px]">
@@ -915,7 +931,7 @@ if (!$initialProfile) {
           <div class="space-y-2">
             <div>
               <p class="text-[11px] font-semibold text-gray-700">1. Who Can Use This App</p>
-              <p>This ordering system is for the NWSSU community and campus visitors. Campus users (students, faculty, and staff) sign up using their official ID number. Guests may sign up using a valid email address.</p>
+              <p>This ordering system is for the NwSSU community and campus visitors. Campus users (students, faculty, and staff) sign up using their official ID number. Guests may sign up using a valid email address.</p>
             </div>
             <div>
               <p class="text-[11px] font-semibold text-gray-700">2. Your Account</p>
@@ -965,11 +981,11 @@ if (!$initialProfile) {
             </div>
             <div>
               <p class="text-[11px] font-semibold text-gray-700">6. Your Choices</p>
-              <p>You can update your profile information anytime in Account Settings, and turn push notifications on or off from the Notifications setting. You may also permanently delete your account at any time using the Delete My Account option; this removes your profile and order history from our system and cannot be undone.</p>
+              <p>You can update your profile information anytime in Account Settings. You may also permanently delete your account at any time using the Delete My Account option; this removes your profile and order history from our system and cannot be undone.</p>
             </div>
             <div>
               <p class="text-[11px] font-semibold text-gray-700">7. Questions</p>
-              <p>For concerns about your data, please contact the NWSSU Food Court administrator.</p>
+              <p>For concerns about your data, please contact the NwSSU Food Court administrator.</p>
             </div>
           </div>
         </div>
@@ -984,7 +1000,7 @@ if (!$initialProfile) {
     <div
       class="bg-white w-full max-w-sm relative z-10 shadow-2xl p-5 space-y-4 text-center rounded-md">
       <div>
-        <p class="text-sm font-bold text-gray-800">Share NWSSU Food Court</p>
+        <p class="text-sm font-bold text-gray-800">Share NwSSU Food Court</p>
         <p class="text-xs text-gray-500 mt-1">Let a friend scan this code to open the app.</p>
       </div>
       <div class="flex items-center justify-center">
@@ -1121,6 +1137,24 @@ if (!$initialProfile) {
   </div>
 
   <script>
+    let deferredInstallPrompt = null;
+
+    window.addEventListener("beforeinstallprompt", (event) => {
+      event.preventDefault();
+      deferredInstallPrompt = event;
+    });
+
+    window.addEventListener("appinstalled", () => {
+      deferredInstallPrompt = null;
+      const button = document.getElementById("installAppBtn");
+      const status = document.getElementById("installAppStatus");
+      if (button && status) {
+        button.disabled = true;
+        button.classList.add("opacity-60", "cursor-default");
+        status.textContent = "App installed";
+      }
+    });
+
     let customerAccount = {
       idNumber: <?php echo json_encode($initialProfile['id_number']); ?>,
       firstName: <?php echo json_encode($initialProfile['first_name']); ?>,
@@ -1789,6 +1823,53 @@ if (!$initialProfile) {
       document.getElementById("profileContent").classList.add("flex");
     }
 
+    function setupInstallApp() {
+      const button = document.getElementById("installAppBtn");
+      const status = document.getElementById("installAppStatus");
+      const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+      const isIOS = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+
+      if (isStandalone) {
+        button.disabled = true;
+        button.classList.add("opacity-60", "cursor-default");
+        status.textContent = "App installed";
+        return;
+      }
+
+      if (isIOS) {
+        status.textContent = "Tap for install instructions";
+        button.addEventListener("click", () => {
+          showToast("Tap Share, then Add to Home Screen", "info");
+        });
+        return;
+      }
+
+      if (deferredInstallPrompt) {
+        status.textContent = "Install on this device";
+      } else {
+        status.textContent = "Available when supported by your browser";
+      }
+
+      button.addEventListener("click", async () => {
+        if (!deferredInstallPrompt) {
+          showToast("Install is not available in this browser yet", "warning");
+          return;
+        }
+
+        const promptEvent = deferredInstallPrompt;
+        deferredInstallPrompt = null;
+        await promptEvent.prompt();
+        const choice = await promptEvent.userChoice;
+
+        if (choice.outcome === "accepted") {
+          status.textContent = "Installing app...";
+        } else {
+          status.textContent = "Install cancelled";
+          deferredInstallPrompt = promptEvent;
+        }
+      });
+    }
+
     function setupTermsPrivacyModal() {
       const modal = document.getElementById("termsPrivacyModal");
       const openModal = () => {
@@ -1827,20 +1908,99 @@ if (!$initialProfile) {
       });
 
       document.getElementById("downloadShareAppQrBtn").addEventListener("click", async () => {
-        const img = document.getElementById("shareAppQrImg");
+        const button = document.getElementById("downloadShareAppQrBtn");
+        const qrImage = document.getElementById("shareAppQrImg");
+        const appUrl = document.getElementById("shareAppUrlText").textContent.trim();
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = "Preparing...";
+
+        const loadImage = (src) => new Promise((resolve, reject) => {
+          const image = new Image();
+          image.onload = () => resolve(image);
+          image.onerror = reject;
+          image.src = src;
+        });
+
+        const drawRoundRect = (context, x, y, width, height, radius) => {
+          const safeRadius = Math.min(radius, width / 2, height / 2);
+          context.beginPath();
+          context.moveTo(x + safeRadius, y);
+          context.arcTo(x + width, y, x + width, y + height, safeRadius);
+          context.arcTo(x + width, y + height, x, y + height, safeRadius);
+          context.arcTo(x, y + height, x, y, safeRadius);
+          context.arcTo(x, y, x + width, y, safeRadius);
+          context.closePath();
+        };
+
         try {
-          const response = await fetch(img.src);
-          const blob = await response.blob();
-          const blobUrl = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = blobUrl;
-          a.download = "nwssu-foodcourt-qr.png";
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(blobUrl);
+          const qrResponse = await fetch(qrImage.src);
+          if (!qrResponse.ok) throw new Error("QR image failed to load");
+          const qrBlob = await qrResponse.blob();
+          const qrUrl = URL.createObjectURL(qrBlob);
+          const qr = await loadImage(qrUrl);
+
+          const canvas = document.createElement("canvas");
+          canvas.width = 900;
+          canvas.height = 1600;
+          const context = canvas.getContext("2d");
+          context.fillStyle = "#ffffff";
+          context.fillRect(0, 0, canvas.width, canvas.height);
+
+          const qrX = 180;
+          const qrY = 420;
+          const qrSize = 540;
+          const bracketColor = "#059669";
+          const bracketOffset = 34;
+          const bracketLength = 74;
+          const bracketWidth = 10;
+
+          context.imageSmoothingEnabled = false;
+          context.drawImage(qr, qrX, qrY, qrSize, qrSize);
+          context.imageSmoothingEnabled = true;
+
+          context.strokeStyle = bracketColor;
+          context.lineWidth = bracketWidth;
+          context.lineCap = "square";
+          context.beginPath();
+          context.moveTo(qrX - bracketOffset, qrY + bracketLength);
+          context.lineTo(qrX - bracketOffset, qrY - bracketOffset);
+          context.lineTo(qrX + bracketLength, qrY - bracketOffset);
+          context.moveTo(qrX + qrSize - bracketLength, qrY - bracketOffset);
+          context.lineTo(qrX + qrSize + bracketOffset, qrY - bracketOffset);
+          context.lineTo(qrX + qrSize + bracketOffset, qrY + bracketLength);
+          context.moveTo(qrX - bracketOffset, qrY + qrSize - bracketLength);
+          context.lineTo(qrX - bracketOffset, qrY + qrSize + bracketOffset);
+          context.lineTo(qrX + bracketLength, qrY + qrSize + bracketOffset);
+          context.moveTo(qrX + qrSize - bracketLength, qrY + qrSize + bracketOffset);
+          context.lineTo(qrX + qrSize + bracketOffset, qrY + qrSize + bracketOffset);
+          context.lineTo(qrX + qrSize + bracketOffset, qrY + qrSize - bracketLength);
+          context.stroke();
+
+          context.textAlign = "center";
+          context.fillStyle = "#064e3b";
+          context.font = "700 44px Poppins, Arial, sans-serif";
+          context.fillText("Share NwSSU Food Court", 450, 1160);
+          context.fillStyle = "#475569";
+          context.font = "500 30px Poppins, Arial, sans-serif";
+          context.fillText("Scan this QR code using your phone camera", 450, 1220);
+          context.font = "400 24px Poppins, Arial, sans-serif";
+          context.fillStyle = "#64748b";
+          context.fillText(appUrl.length > 48 ? appUrl.slice(0, 45) + "..." : appUrl, 450, 1270);
+
+          URL.revokeObjectURL(qrUrl);
+          const cardUrl = canvas.toDataURL("image/png");
+          const link = document.createElement("a");
+          link.href = cardUrl;
+          link.download = "nwssu-foodcourt-share-card.png";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
         } catch (err) {
-          window.open(img.src, "_blank");
+          showToast("Unable to create QR card", "warning");
+        } finally {
+          button.disabled = false;
+          button.textContent = originalText;
         }
       });
     }
@@ -1866,6 +2026,7 @@ if (!$initialProfile) {
       setupEditProfileModal();
       setupChangePasswordModal();
       setupShareAppModal();
+      setupInstallApp();
       setupTermsPrivacyModal();
       setupLogoutModal();
       setupDeleteAccountModal();

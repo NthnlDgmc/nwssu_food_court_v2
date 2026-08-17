@@ -419,7 +419,7 @@ $conn->close();
 
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" id="statsGrid"></div>
 
-        <div class="bg-white border border-gray-200 shadow-sm overflow-hidden" style="border-radius: 6px">
+        <div class="bg-white border border-gray-200 overflow-hidden" style="border-radius: 6px">
           <div class="p-4 border-b border-gray-100">
             <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Quick Actions</p>
             <p class="text-[10px] text-gray-400 mt-0.5">Manage your deliveries in one tap</p>
@@ -460,7 +460,7 @@ $conn->close();
           </div>
         </div>
 
-        <div class="bg-white border border-gray-200 shadow-sm overflow-hidden" style="border-radius: 6px">
+        <div class="bg-white border border-gray-200 overflow-hidden" style="border-radius: 6px">
           <div class="p-4 border-b border-gray-100">
             <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Delivery Status Breakdown</p>
             <p class="text-[10px] text-gray-400 mt-0.5" id="statusOverviewSubtitle">Your deliveries today</p>
@@ -479,7 +479,7 @@ $conn->close();
           </div>
         </div>
 
-        <div class="bg-white border border-gray-200 shadow-sm overflow-hidden" style="border-radius: 6px">
+        <div class="bg-white border border-gray-200 overflow-hidden" style="border-radius: 6px">
           <div class="p-4 border-b border-gray-100 flex items-center justify-between">
             <div>
               <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Active Deliveries</p>
@@ -490,7 +490,7 @@ $conn->close();
           <div class="divide-y divide-gray-100" id="activeDeliveriesList"></div>
         </div>
 
-        <div class="bg-white border border-gray-200 shadow-sm overflow-hidden" style="border-radius: 6px">
+        <div class="bg-white border border-gray-200 overflow-hidden" style="border-radius: 6px">
           <div class="p-4 border-b border-gray-100 flex items-center justify-between">
             <div>
               <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Recent Deliveries</p>
@@ -721,7 +721,7 @@ $conn->close();
       grid.innerHTML = DASHBOARD_STATS.map((stat) => {
         const a = ACCENT_MAP[stat.accent];
         return `
-            <a href="${stat.href}" class="${a.card} border ${a.border} shadow-sm p-3 flex items-center gap-2.5 transition-all hover:shadow-md hover:-translate-y-0.5" style="border-radius:6px">
+            <a href="${stat.href}" class="${a.card} border ${a.border} p-3 flex items-center gap-2.5 transition-all hover:shadow-md hover:-translate-y-0.5" style="border-radius:6px">
               <div class="w-9 h-9 ${a.chip} flex items-center justify-center shrink-0" style="border-radius:3px">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 ${a.icon}">
                   ${stat.icon}

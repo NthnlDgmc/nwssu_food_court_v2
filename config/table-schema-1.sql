@@ -145,7 +145,7 @@ CREATE TABLE carts (
 -- (orders.php, deliveries.php, stall-dashboard.php, order.php) requires BOTH
 -- sets of columns together, so they are combined here into a single table.
 CREATE TABLE orders (
-    order_id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id VARCHAR(20) PRIMARY KEY,
     customer_id INT NOT NULL,
     stall_id INT NOT NULL,
     owner_id INT NULL,
@@ -185,7 +185,7 @@ CREATE TABLE orders (
 
 CREATE TABLE order_items (
     order_item_id INT AUTO_INCREMENT PRIMARY KEY,
-    order_id INT NOT NULL,
+    order_id VARCHAR(20) NOT NULL,
     menu_item_id INT NULL,
     item_name VARCHAR(100) NOT NULL,
     unit_price DECIMAL(10, 2) NOT NULL,

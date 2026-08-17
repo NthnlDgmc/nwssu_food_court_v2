@@ -137,7 +137,7 @@ function fetchOrdersData($conn, $ownerId)
   $orderIds = [];
 
   while ($row = $result->fetch_assoc()) {
-    $orderIdRaw = (int) $row['order_id'];
+    $orderIdRaw = (string) $row['order_id'];
     $orderIds[] = $orderIdRaw;
 
     $deliveryStaff = null;
@@ -151,7 +151,7 @@ function fetchOrdersData($conn, $ownerId)
 
     $orders[$orderIdRaw] = [
       'orderIdRaw' => $orderIdRaw,
-      'id' => 'ORD-' . date('Y', strtotime($row['created_at'])) . '-' . str_pad($orderIdRaw, 6, '0', STR_PAD_LEFT),
+      'id' => $orderIdRaw,
       'date' => date('M j, Y', strtotime($row['created_at'])) . ' · ' . date('g:i A', strtotime($row['created_at'])),
       'customerName' => trim($row['cust_first_name'] . ' ' . $row['cust_last_name']),
       'customerType' => $row['customer_type'],
@@ -180,7 +180,7 @@ function fetchOrdersData($conn, $ownerId)
   }
 
   $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
-  $types = str_repeat('i', count($orderIds));
+  $types = str_repeat('s', count($orderIds));
 
   $itemsStmt = $conn->prepare("
         SELECT oi.order_id, oi.item_name, oi.unit_price, oi.quantity, mi.image
@@ -195,7 +195,7 @@ function fetchOrdersData($conn, $ownerId)
   $itemsResult = $itemsStmt->get_result();
 
   while ($itemRow = $itemsResult->fetch_assoc()) {
-    $oid = (int) $itemRow['order_id'];
+    $oid = (string) $itemRow['order_id'];
     if (isset($orders[$oid])) {
       $orders[$oid]['items'][] = [
         'name' => $itemRow['item_name'],
@@ -221,16 +221,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
   }
 
   if ($action === 'accept_order') {
-    $orderId = (int) ($_POST['order_id'] ?? 0);
+    $orderId = trim((string) ($_POST['order_id'] ?? ''));
 
-    if ($orderId <= 0) {
+    if ($orderId === '') {
       echo json_encode(['success' => false, 'message' => 'Invalid order.']);
       $conn->close();
       exit;
     }
 
     $stmt = $conn->prepare("SELECT status, customer_id, created_at FROM orders WHERE order_id = ? AND owner_id = ? LIMIT 1");
-    $stmt->bind_param("ii", $orderId, $ownerId);
+    $stmt->bind_param("si", $orderId, $ownerId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
@@ -248,12 +248,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     $stmt = $conn->prepare("UPDATE orders SET status = 'preparing' WHERE order_id = ? AND owner_id = ?");
-    $stmt->bind_param("ii", $orderId, $ownerId);
+    $stmt->bind_param("si", $orderId, $ownerId);
     $ok = $stmt->execute();
     $stmt->close();
 
     if ($ok) {
-      $friendlyOrderId = 'ORD-' . date('Y', strtotime($row['created_at'])) . '-' . str_pad($orderId, 6, '0', STR_PAD_LEFT);
+      $friendlyOrderId = $orderId;
       createNotification(
         $conn,
         'customer',
@@ -272,16 +272,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
   }
 
   if ($action === 'mark_ready') {
-    $orderId = (int) ($_POST['order_id'] ?? 0);
+    $orderId = trim((string) ($_POST['order_id'] ?? ''));
 
-    if ($orderId <= 0) {
+    if ($orderId === '') {
       echo json_encode(['success' => false, 'message' => 'Invalid order.']);
       $conn->close();
       exit;
     }
 
     $stmt = $conn->prepare("SELECT status, order_type, customer_id, created_at FROM orders WHERE order_id = ? AND owner_id = ? LIMIT 1");
-    $stmt->bind_param("ii", $orderId, $ownerId);
+    $stmt->bind_param("si", $orderId, $ownerId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
@@ -301,12 +301,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $newStatus = $row['order_type'] === 'delivery' ? 'ready_for_dispatch' : 'ready_for_pickup';
 
     $stmt = $conn->prepare("UPDATE orders SET status = ? WHERE order_id = ? AND owner_id = ?");
-    $stmt->bind_param("sii", $newStatus, $orderId, $ownerId);
+    $stmt->bind_param("ssi", $newStatus, $orderId, $ownerId);
     $ok = $stmt->execute();
     $stmt->close();
 
     if ($ok) {
-      $friendlyOrderId = 'ORD-' . date('Y', strtotime($row['created_at'])) . '-' . str_pad($orderId, 6, '0', STR_PAD_LEFT);
+      $friendlyOrderId = $orderId;
       $readyMessage = $row['order_type'] === 'delivery'
         ? 'Your order ' . $friendlyOrderId . ' is ready and waiting for delivery staff!'
         : 'Your order ' . $friendlyOrderId . ' is ready for pickup. Please proceed to the stall to collect your order.';
@@ -347,10 +347,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
   }
 
   if ($action === 'mark_completed') {
-    $orderId = (int) ($_POST['order_id'] ?? 0);
+    $orderId = trim((string) ($_POST['order_id'] ?? ''));
     $photoData = $_POST['photo_data'] ?? '';
 
-    if ($orderId <= 0) {
+    if ($orderId === '') {
       echo json_encode(['success' => false, 'message' => 'Invalid order.']);
       $conn->close();
       exit;
@@ -363,7 +363,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     $stmt = $conn->prepare("SELECT status, order_type, customer_id, created_at, payment_method FROM orders WHERE order_id = ? AND owner_id = ? LIMIT 1");
-    $stmt->bind_param("ii", $orderId, $ownerId);
+    $stmt->bind_param("si", $orderId, $ownerId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
@@ -392,12 +392,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     } else {
       $stmt = $conn->prepare("UPDATE orders SET status = 'completed', delivery_proof_image = ?, proof_captured_at = NOW() WHERE order_id = ? AND owner_id = ?");
     }
-    $stmt->bind_param("sii", $proofImage, $orderId, $ownerId);
+    $stmt->bind_param("ssi", $proofImage, $orderId, $ownerId);
     $ok = $stmt->execute();
     $stmt->close();
 
     if ($ok) {
-      $friendlyOrderId = 'ORD-' . date('Y', strtotime($row['created_at'])) . '-' . str_pad($orderId, 6, '0', STR_PAD_LEFT);
+      $friendlyOrderId = $orderId;
       createNotification(
         $conn,
         'customer',
@@ -416,17 +416,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
   }
 
   if ($action === 'decline_order') {
-    $orderId = (int) ($_POST['order_id'] ?? 0);
+    $orderId = trim((string) ($_POST['order_id'] ?? ''));
     $reason = trim($_POST['reason'] ?? '');
 
-    if ($orderId <= 0 || $reason === '') {
+    if ($orderId === '' || $reason === '') {
       echo json_encode(['success' => false, 'message' => 'Please provide a reason for declining.']);
       $conn->close();
       exit;
     }
 
     $stmt = $conn->prepare("SELECT status, customer_id, created_at FROM orders WHERE order_id = ? AND owner_id = ? LIMIT 1");
-    $stmt->bind_param("ii", $orderId, $ownerId);
+    $stmt->bind_param("si", $orderId, $ownerId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
@@ -444,12 +444,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     $stmt = $conn->prepare("UPDATE orders SET status = 'cancelled', cancel_reason = ?, cancelled_at = NOW() WHERE order_id = ? AND owner_id = ?");
-    $stmt->bind_param("sii", $reason, $orderId, $ownerId);
+    $stmt->bind_param("ssi", $reason, $orderId, $ownerId);
     $ok = $stmt->execute();
     $stmt->close();
 
     if ($ok) {
-      $friendlyOrderId = 'ORD-' . date('Y', strtotime($row['created_at'])) . '-' . str_pad($orderId, 6, '0', STR_PAD_LEFT);
+      $friendlyOrderId = $orderId;
       createNotification(
         $conn,
         'customer',
@@ -486,7 +486,11 @@ $conn->close();
   <title>Stall - Orders</title>
   <link rel="icon" href="../assets/images/nwssu-logo.png" type="image/png" />
   <link rel="manifest" href="../manifest.json" />
-  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Norwesso Eats" />
+  <link rel="apple-touch-icon" href="../assets/images/icon-192.png" />
+  <link href="../assets/css/tailwind.css" rel="stylesheet" />
   <style>
     @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
 
@@ -556,8 +560,8 @@ $conn->close();
     </div>
 
     <div class="flex-1 overflow-y-auto mt-12 mb-16" id="mainContent">
-      <div class="max-w-5xl mx-auto px-4 pt-3 pb-4 space-y-3">
-        <div class="rounded-md bg-white border border-gray-200 p-3 shadow-sm space-y-3">
+      <div class="max-w-5xl mx-auto px-4 pt-3 pb-4">
+        <div class="rounded-md bg-white border border-gray-200 p-3 space-y-3">
           <div class="flex items-center gap-2">
             <div class="relative flex-1 min-w-0">
               <input
@@ -598,7 +602,7 @@ $conn->close();
           <div id="statusTabsContainer" class="flex items-center gap-2 overflow-x-auto no-scrollbar"></div>
         </div>
 
-        <div id="ordersContainer" class="space-y-3"></div>
+        <div id="ordersContainer" class="space-y-3 mt-3"></div>
 
         <div id="emptyView" class="hidden flex flex-col items-center justify-center py-16 text-center">
           <div class="w-40 h-40 mb-4">
@@ -1021,14 +1025,14 @@ $conn->close();
       const total = calcTotal(order);
       const subtotal = order.items.reduce((s, i) => s + i.price * i.qty, 0);
       const card = document.createElement("div");
-      card.className = "rounded-md bg-white border border-gray-200 overflow-hidden shadow-sm";
+      card.className = "rounded-md bg-white border border-gray-200 overflow-hidden";
       card.setAttribute("data-order-id", order.orderIdRaw);
 
       const itemsHTML = order.items
         .map(
           (item) => `
           <div class="flex items-center gap-3">
-            ${item.img ? `<img src="${item.img}" alt="${escapeHtml(item.name)}" class="w-10 h-10 object-cover bg-gray-100 shrink-0 rounded-[3px]" />` : `<div class="w-10 h-10 bg-gray-100 shrink-0 rounded-[3px]"></div>`}
+            ${item.img ? `<img src="${item.img}" alt="${escapeHtml(item.name)}" class="w-10 h-10 object-cover bg-gray-100 shrink-0 rounded-[3px]" />` : `<div class="w-10 h-10 bg-gray-100 shrink-0 rounded-[3px] flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-300"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg></div>`}
             <div class="flex-1 flex items-center justify-between">
               <div class="flex flex-col">
                 <span class="text-xs text-gray-600">${escapeHtml(item.name)} x${item.qty}</span>
@@ -1210,7 +1214,7 @@ $conn->close();
               .map(
                 (item) => `
               <div class="flex items-center gap-3">
-                ${item.img ? `<img src="${item.img}" alt="${escapeHtml(item.name)}" class="w-12 h-12 object-cover bg-gray-100 shrink-0 rounded-[3px]" />` : `<div class="w-12 h-12 bg-gray-100 shrink-0 rounded-[3px]"></div>`}
+                ${item.img ? `<img src="${item.img}" alt="${escapeHtml(item.name)}" class="w-12 h-12 object-cover bg-gray-100 shrink-0 rounded-[3px]" />` : `<div class="w-12 h-12 bg-gray-100 shrink-0 rounded-[3px] flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-300"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg></div>`}
                 <div class="flex-1 flex justify-between">
                   <div class="flex flex-col">
                     <span class="text-xs text-gray-600">${escapeHtml(item.name)} x${item.qty}</span>
@@ -1437,7 +1441,7 @@ $conn->close();
 
     function bindEvents() {
       document.querySelectorAll(".view-details-btn").forEach((btn) => {
-        btn.addEventListener("click", () => showOrderDetails(parseInt(btn.getAttribute("data-id"))));
+        btn.addEventListener("click", () => showOrderDetails(btn.getAttribute("data-id")));
       });
 
       document.querySelectorAll(".copy-id-btn").forEach((btn) => {
@@ -1451,26 +1455,26 @@ $conn->close();
       document.querySelectorAll(".accept-btn").forEach((btn) => {
         btn.addEventListener("click", () => {
           if (btn.disabled) return;
-          openAcceptOrderModal(parseInt(btn.getAttribute("data-id")));
+          openAcceptOrderModal(btn.getAttribute("data-id"));
         });
       });
 
       document.querySelectorAll(".mark-ready-btn").forEach((btn) => {
         btn.addEventListener("click", () => {
           if (btn.disabled) return;
-          openMarkReadyModal(parseInt(btn.getAttribute("data-id")));
+          openMarkReadyModal(btn.getAttribute("data-id"));
         });
       });
 
       document.querySelectorAll(".mark-completed-btn").forEach((btn) => {
         btn.addEventListener("click", () => {
           if (btn.disabled) return;
-          openCompleteProofModal(parseInt(btn.getAttribute("data-id")));
+          openCompleteProofModal(btn.getAttribute("data-id"));
         });
       });
 
       document.querySelectorAll(".decline-btn").forEach((btn) => {
-        btn.addEventListener("click", () => openDeclineModal(parseInt(btn.getAttribute("data-id"))));
+        btn.addEventListener("click", () => openDeclineModal(btn.getAttribute("data-id")));
       });
     }
 

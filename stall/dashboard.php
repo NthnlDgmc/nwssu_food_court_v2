@@ -133,10 +133,10 @@ function fetchRecentOrders($conn, $ownerId, $limit = 5)
   $orderIds = [];
 
   while ($row = $result->fetch_assoc()) {
-    $orderIdRaw = (int) $row['order_id'];
+    $orderIdRaw = (string) $row['order_id'];
     $orderIds[] = $orderIdRaw;
     $orders[$orderIdRaw] = [
-      'code' => 'ORD-' . date('Y', strtotime($row['created_at'])) . '-' . str_pad($orderIdRaw, 6, '0', STR_PAD_LEFT),
+      'code' => $orderIdRaw,
       'customer' => trim($row['first_name'] . ' ' . $row['last_name']),
       'customerType' => $row['customer_type'],
       'customerImage' => $row['profile_image'] ? '../' . $row['profile_image'] : null,
@@ -153,7 +153,7 @@ function fetchRecentOrders($conn, $ownerId, $limit = 5)
   }
 
   $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
-  $types = str_repeat('i', count($orderIds));
+  $types = str_repeat('s', count($orderIds));
 
   $itemsStmt = $conn->prepare("
         SELECT order_id, item_name, quantity
@@ -168,7 +168,7 @@ function fetchRecentOrders($conn, $ownerId, $limit = 5)
 
   $itemsByOrder = [];
   while ($itemRow = $itemsResult->fetch_assoc()) {
-    $oid = (int) $itemRow['order_id'];
+    $oid = (string) $itemRow['order_id'];
     if (!isset($itemsByOrder[$oid])) {
       $itemsByOrder[$oid] = [];
     }
@@ -543,7 +543,7 @@ $conn->close();
           </div>
         </div>
         <?php if ($myStall): ?>
-          <div class="bg-white border border-gray-200 shadow-sm rounded-md p-3 flex items-center justify-between gap-3">
+          <div class="bg-white border border-gray-200 rounded-md p-3 flex items-center justify-between gap-3">
             <div class="flex items-center gap-2.5 min-w-0">
               <span id="stallStatusDot" class="w-2.5 h-2.5 rounded-full <?php echo $myStall['status'] === 'open' ? 'bg-emerald-500' : 'bg-gray-300'; ?> shrink-0"></span>
               <div class="min-w-0">
@@ -567,7 +567,7 @@ $conn->close();
 
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" id="statsGrid"></div>
 
-        <div class="bg-white border border-gray-200 shadow-sm overflow-hidden" style="border-radius:6px">
+        <div class="bg-white border border-gray-200 overflow-hidden" style="border-radius:6px">
           <div class="p-4 border-b border-gray-100">
             <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Quick Actions</p>
             <p class="text-[10px] text-gray-400 mt-0.5">Manage your stall in one tap</p>
@@ -624,7 +624,7 @@ $conn->close();
           </div>
         </div>
 
-        <div class="bg-white border border-gray-200 shadow-sm overflow-hidden" style="border-radius:6px">
+        <div class="bg-white border border-gray-200 overflow-hidden" style="border-radius:6px">
           <div class="p-4 border-b border-gray-100">
             <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Order Status Breakdown</p>
             <p class="text-[10px] text-gray-400 mt-0.5" id="statusOverviewSubtitle">Delivery orders by status</p>
@@ -633,7 +633,7 @@ $conn->close();
             <div class="relative flex bg-gray-100 p-1 mb-4 max-w-[200px] rounded-[3px]" id="statusTypeTabs">
               <div
                 id="statusTypeIndicator"
-                class="absolute top-1 bottom-1 bg-white shadow-sm transition-all duration-300 ease-out rounded-[3px]"></div>
+                class="absolute top-1 bottom-1 bg-white transition-all duration-300 ease-out rounded-[3px]"></div>
               <button type="button" data-type="delivery" class="status-type-tab relative z-10 flex-1 py-1.5 text-[11px] font-semibold transition-colors duration-200 rounded-[3px]">Delivery</button>
               <button type="button" data-type="pickup" class="status-type-tab relative z-10 flex-1 py-1.5 text-[11px] font-semibold transition-colors duration-200 rounded-[3px]">Pickup</button>
             </div>
@@ -651,7 +651,7 @@ $conn->close();
           </div>
         </div>
 
-        <div class="bg-white border border-gray-200 shadow-sm overflow-hidden" style="border-radius:6px">
+        <div class="bg-white border border-gray-200 overflow-hidden" style="border-radius:6px">
           <div class="p-4 border-b border-gray-100 flex items-center justify-between gap-3">
             <div class="min-w-0">
               <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Recent Orders</p>
@@ -662,7 +662,7 @@ $conn->close();
           <div class="divide-y divide-gray-100" id="recentOrdersList"></div>
         </div>
 
-        <div class="bg-white border border-gray-200 shadow-sm overflow-hidden" style="border-radius:6px">
+        <div class="bg-white border border-gray-200 overflow-hidden" style="border-radius:6px">
           <div class="p-4 border-b border-gray-100 flex items-center justify-between gap-3">
             <div class="min-w-0">
               <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Best Selling Items</p>
@@ -673,7 +673,7 @@ $conn->close();
           <div class="divide-y divide-gray-100" id="topItemsList"></div>
         </div>
 
-        <div class="bg-white border border-gray-200 shadow-sm overflow-hidden" style="border-radius:6px">
+        <div class="bg-white border border-gray-200 overflow-hidden" style="border-radius:6px">
           <div class="p-4 border-b border-gray-100">
             <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Top Customers</p>
             <p class="text-[10px] text-gray-400 mt-0.5">Based on total spend this month</p>
@@ -1008,7 +1008,7 @@ $conn->close();
       grid.innerHTML = DASHBOARD_STATS.map((stat) => {
         const a = ACCENT_MAP[stat.accent];
         return `
-            <a href="${stat.href}" class="${a.card} border ${a.border} shadow-sm p-3 flex items-center gap-2.5 transition-all hover:shadow-md hover:-translate-y-0.5" style="border-radius:6px">
+            <a href="${stat.href}" class="${a.card} border ${a.border} p-3 flex items-center gap-2.5 transition-all hover:shadow-md hover:-translate-y-0.5" style="border-radius:6px">
               <div class="w-9 h-9 ${a.chip} flex items-center justify-center shrink-0" style="border-radius:3px">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 ${a.icon}">
                   ${stat.icon}

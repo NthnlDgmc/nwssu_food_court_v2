@@ -35,6 +35,18 @@ function refValues($arr)
   return $refs;
 }
 
+function generateOrderId()
+{
+  $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  $random = '';
+
+  for ($i = 0; $i < 8; $i++) {
+    $random .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+  }
+
+  return 'ORD-' . date('Y') . '-' . $random;
+}
+
 function createNotification($conn, $userType, $userId, $title, $message, $link = null)
 {
   $stmt = $conn->prepare("INSERT INTO notifications (user_type, user_id, title, message, link) VALUES (?, ?, ?, ?, ?)");
@@ -177,40 +189,48 @@ function createOrdersFromCheckoutData($conn, $customerId, $checkoutData)
   $allCartIds = [];
 
   foreach ($checkoutData['groups'] as $group) {
+    $newOrderId = generateOrderId();
+    $stallId = (int) $group['stall_id'];
+    $ownerId = $group['owner_id'] !== null ? (int) $group['owner_id'] : null;
+    $staffId = $group['staff_id'] !== null ? (int) $group['staff_id'] : null;
+    $totalAmount = (float) $group['total_amount'];
+    $deliveryFee = (float) $group['delivery_fee'];
+    $grandTotal = (float) $group['grand_total'];
+    $note = $group['note'];
+
     $stmt = $conn->prepare("
             INSERT INTO orders
-                (customer_id, stall_id, owner_id, staff_id, order_type, status, payment_method, payment_status,
+                (order_id, customer_id, stall_id, owner_id, staff_id, order_type, status, payment_method, payment_status,
                  total_amount, total_delivery_fee, grand_total, drop_off_location, note)
-            VALUES (?, ?, ?, ?, ?, 'pending', ?, 'paid', ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, 'paid', ?, ?, ?, ?, ?)
         ");
     $stmt->bind_param(
-      "iiiissdddss",
+      "siiiissdddss",
+      $newOrderId,
       $customerId,
-      $group['stall_id'],
-      $group['owner_id'],
-      $group['staff_id'],
+      $stallId,
+      $ownerId,
+      $staffId,
       $orderType,
       $paymentMethod,
-      $group['total_amount'],
-      $group['delivery_fee'],
-      $group['grand_total'],
+      $totalAmount,
+      $deliveryFee,
+      $grandTotal,
       $location,
-      $group['note']
+      $note
     );
     $stmt->execute();
-    $newOrderId = $stmt->insert_id;
     $stmt->close();
 
     $createdOrderIds[] = $newOrderId;
 
-    if ($group['owner_id'] !== null) {
-      $friendlyOrderId = 'ORD-' . date('Y') . '-' . str_pad($newOrderId, 6, '0', STR_PAD_LEFT);
+    if ($ownerId !== null) {
       createNotification(
         $conn,
         'stall_owner',
-        $group['owner_id'],
+        $ownerId,
         'New Order Received',
-        $customerFullName . ' placed order ' . $friendlyOrderId . ' worth ₱' . number_format($group['grand_total'], 2) . '.',
+        $customerFullName . ' placed order ' . $newOrderId . ' worth ₱' . number_format($grandTotal, 2) . '.',
         '../stall/orders.php'
       );
     }
@@ -220,13 +240,18 @@ function createOrdersFromCheckoutData($conn, $customerId, $checkoutData)
             VALUES (?, ?, ?, ?, ?)
         ");
     foreach ($group['items'] as $item) {
+      $menuItemId = $item['menu_item_id'];
+      $itemName = $item['item_name'];
+      $itemPrice = $item['price'];
+      $itemQuantity = $item['quantity'];
+
       $itemStmt->bind_param(
-        "iisdi",
+        "sisdi",
         $newOrderId,
-        $item['menu_item_id'],
-        $item['item_name'],
-        $item['price'],
-        $item['quantity']
+        $menuItemId,
+        $itemName,
+        $itemPrice,
+        $itemQuantity
       );
       $itemStmt->execute();
     }
@@ -326,17 +351,14 @@ if ($transactionId > 0) {
       $displayAmount = (float) $txn['amount'];
       $displayPaymentMethod = $txn['payment_method'] === 'gcash' ? 'GCash' : 'Maya';
 
-      if (isset($newOrderIds) && !empty($newOrderIds)) {
-        $rawOrderIds = $newOrderIds;
+            if (isset($newOrderIds) && !empty($newOrderIds)) {
+        $displayOrderIds = $newOrderIds;
       } else {
-        $rawOrderIds = array_map('intval', explode(',', $txn['order_ids']));
+        $displayOrderIds = array_filter(array_map('trim', explode(',', (string) $txn['order_ids'])));
       }
 
-      $formattedIds = array_map(function ($oid) {
-        return 'ORD-' . date('Y') . '-' . str_pad($oid, 6, '0', STR_PAD_LEFT);
-      }, $rawOrderIds);
+      $displayOrderId = implode(', ', $displayOrderIds);
 
-      $displayOrderId = implode(', ', $formattedIds);
     }
   }
 }

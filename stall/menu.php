@@ -125,6 +125,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
 
+    if (strpos($imageData, 'data:image') !== 0) {
+      echo json_encode(['success' => false, 'message' => 'Please upload an item photo.']);
+      $conn->close();
+      exit;
+    }
+
     if (!categoryExists($conn, $categoryId)) {
       echo json_encode(['success' => false, 'message' => 'Invalid category selected.']);
       $conn->close();
@@ -198,6 +204,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     } elseif (strpos($imageData, 'data:image') === 0) {
       deleteMenuItemImage($imagePath);
       $imagePath = saveMenuItemImage($imageData);
+    }
+
+    if ($imagePath === null) {
+      echo json_encode(['success' => false, 'message' => 'Please upload an item photo.']);
+      $conn->close();
+      exit;
     }
 
     $stmt = $conn->prepare("UPDATE menu_items SET category_id = ?, item_name = ?, price = ?, image = ?, status = ? WHERE menu_item_id = ? AND owner_id = ?");
@@ -353,7 +365,7 @@ $conn->close();
 
     <div class="flex-1 overflow-y-auto mt-12 mb-16" id="mainContent">
       <div class="max-w-5xl mx-auto px-4 pt-3 pb-4 space-y-3">
-        <div class="rounded-md bg-white border border-gray-200 shadow-sm p-3 space-y-3">
+        <div class="rounded-md bg-white border border-gray-200 p-3 space-y-3">
           <div class="relative">
             <input
               type="text"
@@ -449,7 +461,7 @@ $conn->close();
           </div>
         </div>
 
-        <div class="rounded-md bg-white border border-gray-200 shadow-sm overflow-hidden">
+        <div class="rounded-md bg-white border border-gray-200 overflow-hidden">
           <div class="p-4 border-b border-gray-100 flex items-center justify-between">
             <p class="text-xs font-bold text-gray-700">
               All Menu Items
@@ -849,16 +861,6 @@ $conn->close();
         .replace(/"/g, "&quot;");
     }
 
-    function getInitials(name) {
-      return String(name || "")
-        .split(" ")
-        .filter(Boolean)
-        .map((w) => w[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase();
-    }
-
     function formatPrice(price) {
       return "\u20B1" + Number(price).toFixed(2);
     }
@@ -874,10 +876,7 @@ $conn->close();
     }
 
     function itemImageHtml(item) {
-      if (item.image) {
-        return `<img src="${escapeHtml(item.image)}" class="w-12 h-12 object-cover shrink-0" style="border-radius:6px" />`;
-      }
-      return `<div class="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-white text-xs font-bold shrink-0" style="border-radius:6px">${getInitials(item.name)}</div>`;
+      return `<img src="${escapeHtml(item.image)}" class="w-12 h-12 object-cover shrink-0" style="border-radius:6px" />`;
     }
 
     function getAllCategories() {
@@ -1183,6 +1182,12 @@ $conn->close();
 
       if (priceRaw === "" || isNaN(price) || price < 0) {
         errMsg.textContent = "Please enter a valid price.";
+        errEl.classList.remove("hidden");
+        return;
+      }
+
+      if (!currentItemImage) {
+        errMsg.textContent = "Please upload an item photo.";
         errEl.classList.remove("hidden");
         return;
       }
