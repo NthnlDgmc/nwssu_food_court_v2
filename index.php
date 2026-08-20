@@ -149,9 +149,200 @@ $conn->close();
       }
     }
 
+        .food-banner-carousel {
+      position: relative;
+      width: 100%;
+      overflow: hidden;
+      border-radius: 6px;
+      isolation: isolate;
+      background: #f1f5f9;
+    }
+
+    .food-banner-viewport {
+      width: 100%;
+      overflow: hidden;
+      touch-action: pan-y;
+      user-select: none;
+    }
+
+    .food-banner-track {
+      display: flex;
+      width: 100%;
+      transform: translate3d(0, 0, 0);
+      transition: transform 0.55s cubic-bezier(0.22, 0.61, 0.36, 1);
+      will-change: transform;
+    }
+
+    .food-banner-slide {
+      flex: 0 0 100%;
+      min-width: 100%;
+      aspect-ratio: 4 / 1;
+      position: relative;
+      overflow: hidden;
+      background: #e5e7eb;
+    }
+
+    .food-banner-slide::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      background: linear-gradient(105deg, #e5e7eb 8%, #f3f4f6 18%, #e5e7eb 33%);
+      background-size: 220% 100%;
+      animation: food-banner-shimmer 1.35s linear infinite;
+      transition: opacity 0.3s ease;
+    }
+
+    .food-banner-slide.loaded::before {
+      opacity: 0;
+      animation: none;
+    }
+
+    .food-banner-slide img {
+      position: relative;
+      z-index: 1;
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      opacity: 0;
+      transition: opacity 0.35s ease;
+    }
+
+    .food-banner-slide img.loaded {
+      opacity: 1;
+    }
+
+    @keyframes food-banner-shimmer {
+      from {
+        background-position: 100% 0;
+      }
+      to {
+        background-position: -100% 0;
+      }
+    }
+
+    .food-banner-controls {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 2;
+      display: flex;
+      gap: 6px;
+    }
+
+    .food-banner-control {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      padding: 0;
+      color: #ffffff;
+      background: rgba(15, 23, 42, 0.56);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 6px;
+      backdrop-filter: blur(8px);
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+
+    .food-banner-control:hover,
+    .food-banner-control:focus-visible {
+      background: rgba(15, 23, 42, 0.8);
+      transform: scale(1.05);
+      outline: none;
+    }
+
+    .food-banner-dots {
+      position: absolute;
+      left: 50%;
+      bottom: 12px;
+      z-index: 2;
+      display: flex;
+      gap: 6px;
+      transform: translateX(-50%);
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.42);
+      backdrop-filter: blur(8px);
+    }
+
+    .food-banner-dot {
+      width: 7px;
+      height: 7px;
+      padding: 0;
+      border: 0;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.58);
+      transition: width 0.25s ease, background 0.25s ease;
+    }
+
+    .food-banner-dot.active {
+      width: 21px;
+      background: #ffffff;
+    }
+
+    .food-banner-lightbox-image {
+      position: relative;
+      z-index: 1;
+      width: min(94vw, 1400px);
+      max-height: 85vh;
+      object-fit: contain;
+      border-radius: 6px;
+    }
+
+    .food-banner-lightbox-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.1);
+      border: 0;
+      border-radius: 6px;
+      transition: background 0.2s ease;
+    }
+
+    .food-banner-lightbox-close:hover,
+    .food-banner-lightbox-close:focus-visible {
+      background: rgba(255, 255, 255, 0.24);
+      outline: none;
+    }
+
+    @media (max-width: 640px) {
+      .food-banner-carousel {
+        border-radius: 6px;
+      }
+
+      .food-banner-slide {
+        aspect-ratio: 16 / 7;
+      }
+
+      .food-banner-controls {
+        top: 8px;
+        right: 8px;
+      }
+
+      .food-banner-control {
+        width: 30px;
+        height: 30px;
+      }
+
+      .food-banner-dots {
+        bottom: 8px;
+      }
+    }
+
     .modal-overlay {
       background-color: rgba(0, 0, 0, 0.5);
     }
+
   </style>
 </head>
 
@@ -161,10 +352,10 @@ $conn->close();
     <div class="bg-white flex-shrink-0 fixed top-0 left-0 right-0 z-20">
       <div class="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
         <div class="flex items-center gap-2.5 min-w-0">
-          <img src="assets/images/nwssu-logo.svg" alt="NWSSU Food Court" class="w-9 h-9 object-contain shrink-0" />
+          <img src="assets/images/nwssu-logo.png" alt="NWSSU Food Court" class="w-9 h-9 object-contain shrink-0" />
           <div class="min-w-0">
             <p class="text-sm font-bold text-gray-800 leading-tight truncate">
-              NWSSU <span class="text-emerald-600">Food Court</span>
+              <span class="text-emerald-600">NwSSU Food Court</span>
             </p>
             <p class="text-[10px] text-gray-400 leading-none mt-0.5 truncate">
               Browse the menu — sign in to order
@@ -204,17 +395,45 @@ $conn->close();
                 </svg>
               </button>
             </div>
-            <button type="button" id="openFilterBtn" class="relative h-full px-3 py-2 bg-white border border-gray-200 text-gray-700 flex items-center justify-center focus:outline-none focus:border-emerald-600 rounded-[3px]">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+<button type="button" id="openFilterBtn" class="relative h-full px-3 py-2 bg-emerald-600 border border-emerald-600 text-white hover:bg-emerald-700 flex items-center justify-center focus:outline-none focus:border-emerald-700 rounded-[3px]">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-white">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
               </svg>
             </button>
           </div>
         </div>
 
+                <div class="food-banner-carousel" id="indexFoodBannerCarousel" aria-label="Featured food banners">
+          <div class="food-banner-viewport" id="indexFoodBannerViewport">
+            <div class="food-banner-track" id="indexFoodBannerTrack">
+              <div class="food-banner-slide"><img src="assets/images/banner1.png" alt="Featured food banner 1" draggable="false" onload="this.classList.add('loaded'); this.parentElement.classList.add('loaded');" /></div>
+              <div class="food-banner-slide"><img src="assets/images/banner2.png" alt="Featured food banner 2" draggable="false" onload="this.classList.add('loaded'); this.parentElement.classList.add('loaded');" /></div>
+              <div class="food-banner-slide"><img src="assets/images/banner3.png" alt="Featured food banner 3" draggable="false" onload="this.classList.add('loaded'); this.parentElement.classList.add('loaded');" /></div>
+            </div>
+          </div>
+          <div class="food-banner-controls" aria-label="Banner controls">
+            <button type="button" class="food-banner-control" id="indexFoodBannerPause" aria-label="Pause banner autoplay" title="Pause autoplay">
+              <svg id="indexFoodBannerPauseIcon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="w-4 h-4" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 5.25v13.5m7.5-13.5v13.5" />
+              </svg>
+            </button>
+            <button type="button" class="food-banner-control" id="indexFoodBannerFullscreen" aria-label="View banner fullscreen" title="View fullscreen">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="w-4 h-4" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 7.5V5.25A1.5 1.5 0 0 1 5.25 3.75H7.5m9 0h2.25a1.5 1.5 0 0 1 1.5 1.5V7.5m0 9v2.25a1.5 1.5 0 0 1-1.5 1.5H16.5m-9 0H5.25a1.5 1.5 0 0 1-1.5-1.5V16.5" />
+              </svg>
+            </button>
+          </div>
+          <div class="food-banner-dots" id="indexFoodBannerDots" aria-label="Choose a banner">
+            <button type="button" class="food-banner-dot active" data-banner-index="0" aria-label="Go to banner 1" aria-current="true"></button>
+            <button type="button" class="food-banner-dot" data-banner-index="1" aria-label="Go to banner 2"></button>
+            <button type="button" class="food-banner-dot" data-banner-index="2" aria-label="Go to banner 3"></button>
+          </div>
+        </div>
+
         <div class="bg-white border border-gray-200 p-3 rounded-md">
           <div class="flex gap-2 overflow-x-auto no-scrollbar">
             <button class="category-btn category-active-custom px-4 py-2 border border-gray-200 bg-white flex-shrink-0 text-xs font-semibold whitespace-nowrap rounded-[3px]" data-cat-id="all">All</button>
+
             <?php foreach ($categories as $cat): ?>
               <button class="category-btn px-4 py-2 border border-gray-200 bg-white text-gray-500 hover:border-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 flex-shrink-0 text-xs font-semibold whitespace-nowrap rounded-[3px]" data-cat-id="<?php echo $cat['category_id']; ?>"><?php echo htmlspecialchars($cat['category_name']); ?></button>
             <?php endforeach; ?>
@@ -363,6 +582,16 @@ $conn->close();
     </div>
   </div>
 
+  <div id="indexFoodBannerLightbox" class="fixed inset-0 z-[70] hidden items-center justify-center px-4" aria-hidden="true">
+    <div id="indexFoodBannerLightboxOverlay" class="absolute inset-0 bg-black/80"></div>
+    <button type="button" id="indexFoodBannerLightboxClose" class="food-banner-lightbox-close" aria-label="Close banner viewer" title="Close">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="w-6 h-6" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+      </svg>
+    </button>
+    <img id="indexFoodBannerLightboxImage" src="" alt="" class="food-banner-lightbox-image" />
+  </div>
+
   <script>
     const ALL_MENU_ITEMS = <?php echo json_encode($menuItems); ?>;
 
@@ -392,7 +621,7 @@ $conn->close();
                   <h3 class="text-sm font-semibold text-gray-900 truncate">${escapeHtml(item.item_name)}</h3>
                   <p class="text-xs text-gray-500 mt-0.5 truncate">${escapeHtml(item.stall_name)}</p>
                 </div>
-                <span class="text-base font-bold text-emerald-600 shrink-0">&#8369;${item.price.toFixed(0)}</span>
+                <span class="text-sm font-bold text-emerald-600 shrink-0">&#8369;${item.price.toFixed(2)}</span>
               </div>
               <button type="button" class="w-full mt-2 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium flex items-center justify-center gap-1 transition-all add-btn rounded-[3px]">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
@@ -460,8 +689,159 @@ $conn->close();
       updateLoadMoreVisibility();
     }
 
+        function setupIndexFoodBannerCarousel() {
+      const carousel = document.getElementById("indexFoodBannerCarousel");
+      const viewport = document.getElementById("indexFoodBannerViewport");
+      const track = document.getElementById("indexFoodBannerTrack");
+      const dots = Array.from(document.querySelectorAll("#indexFoodBannerDots .food-banner-dot"));
+      const pauseBtn = document.getElementById("indexFoodBannerPause");
+      const pauseIcon = document.getElementById("indexFoodBannerPauseIcon");
+      const fullscreenBtn = document.getElementById("indexFoodBannerFullscreen");
+      const lightbox = document.getElementById("indexFoodBannerLightbox");
+      const lightboxOverlay = document.getElementById("indexFoodBannerLightboxOverlay");
+      const lightboxClose = document.getElementById("indexFoodBannerLightboxClose");
+      const lightboxImage = document.getElementById("indexFoodBannerLightboxImage");
+
+      if (!carousel || !viewport || !track || !dots.length) return;
+
+      let activeIndex = 0;
+      let autoplayTimer = null;
+      let interactionTimer = null;
+      let isAutoplayPaused = false;
+      let touchStartX = 0;
+      let touchDeltaX = 0;
+      let isPointerDown = false;
+
+      function updateBanner(index, animate = true) {
+        activeIndex = (index + dots.length) % dots.length;
+        track.style.transition = animate ? "transform 0.55s cubic-bezier(0.22, 0.61, 0.36, 1)" : "none";
+        track.style.transform = `translate3d(-${activeIndex * 100}%, 0, 0)`;
+        dots.forEach((dot, dotIndex) => {
+          const isActive = dotIndex === activeIndex;
+          dot.classList.toggle("active", isActive);
+          dot.setAttribute("aria-current", isActive ? "true" : "false");
+        });
+      }
+
+      function stopAutoplay() {
+        clearInterval(autoplayTimer);
+        autoplayTimer = null;
+      }
+
+      function startAutoplay() {
+        stopAutoplay();
+        if (isAutoplayPaused) return;
+        autoplayTimer = setInterval(() => updateBanner(activeIndex + 1), 3000);
+      }
+
+      function pauseAfterInteraction() {
+        stopAutoplay();
+        clearTimeout(interactionTimer);
+        if (!isAutoplayPaused) {
+          interactionTimer = setTimeout(startAutoplay, 1600);
+        }
+      }
+
+      function updatePauseControl() {
+        pauseBtn.setAttribute("aria-label", isAutoplayPaused ? "Resume banner autoplay" : "Pause banner autoplay");
+        pauseBtn.setAttribute("title", isAutoplayPaused ? "Resume autoplay" : "Pause autoplay");
+        pauseIcon.innerHTML = isAutoplayPaused
+          ? '<path stroke-linecap="round" stroke-linejoin="round" d="M8.25 5.25 18 12l-9.75 6.75V5.25Z" />'
+          : '<path stroke-linecap="round" stroke-linejoin="round" d="M8.25 5.25v13.5m7.5-13.5v13.5" />';
+      }
+
+      pauseBtn.addEventListener("click", () => {
+        isAutoplayPaused = !isAutoplayPaused;
+        clearTimeout(interactionTimer);
+        if (isAutoplayPaused) {
+          stopAutoplay();
+        } else {
+          startAutoplay();
+        }
+        updatePauseControl();
+      });
+
+      dots.forEach((dot) => {
+        dot.addEventListener("click", () => {
+          updateBanner(Number(dot.dataset.bannerIndex));
+          pauseAfterInteraction();
+        });
+      });
+
+      ["mouseenter", "focusin", "touchstart"].forEach((eventName) => {
+        carousel.addEventListener(eventName, stopAutoplay, { passive: true });
+      });
+      ["mouseleave", "focusout", "touchend", "touchcancel"].forEach((eventName) => {
+        carousel.addEventListener(eventName, startAutoplay, { passive: true });
+      });
+
+      viewport.addEventListener("touchstart", (event) => {
+        touchStartX = event.changedTouches[0].clientX;
+        touchDeltaX = 0;
+        isPointerDown = true;
+        track.style.transition = "none";
+        stopAutoplay();
+      }, { passive: true });
+
+      viewport.addEventListener("touchmove", (event) => {
+        if (!isPointerDown) return;
+        touchDeltaX = event.changedTouches[0].clientX - touchStartX;
+        track.style.transform = `translate3d(calc(-${activeIndex * 100}% + ${touchDeltaX}px), 0, 0)`;
+      }, { passive: true });
+
+      function finishTouchSwipe() {
+        if (!isPointerDown) return;
+        isPointerDown = false;
+        track.style.transition = "transform 0.55s cubic-bezier(0.22, 0.61, 0.36, 1)";
+        if (Math.abs(touchDeltaX) > 45) {
+          updateBanner(activeIndex + (touchDeltaX < 0 ? 1 : -1));
+        } else {
+          updateBanner(activeIndex);
+        }
+        touchDeltaX = 0;
+        pauseAfterInteraction();
+      }
+
+      viewport.addEventListener("touchend", finishTouchSwipe, { passive: true });
+      viewport.addEventListener("touchcancel", finishTouchSwipe, { passive: true });
+
+      function closeBannerLightbox() {
+        lightbox.classList.add("hidden");
+        lightbox.classList.remove("flex");
+        lightbox.setAttribute("aria-hidden", "true");
+        lightboxImage.src = "";
+        lightboxImage.alt = "";
+        document.body.style.overflow = "";
+      }
+
+      fullscreenBtn.addEventListener("click", () => {
+        const activeImage = track.querySelectorAll(".food-banner-slide img")[activeIndex];
+        if (!activeImage) return;
+        lightboxImage.src = activeImage.currentSrc || activeImage.src;
+        lightboxImage.alt = activeImage.alt;
+        lightbox.classList.remove("hidden");
+        lightbox.classList.add("flex");
+        lightbox.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+        lightboxClose.focus();
+      });
+
+      lightboxClose.addEventListener("click", closeBannerLightbox);
+      lightboxOverlay.addEventListener("click", closeBannerLightbox);
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !lightbox.classList.contains("hidden")) {
+          closeBannerLightbox();
+        }
+      });
+
+      updatePauseControl();
+      updateBanner(0, false);
+      startAutoplay();
+    }
+
     function loadContent() {
       document.getElementById("featured-skeleton").classList.add("hidden");
+
       document.getElementById("featured-content").classList.remove("hidden");
       initializeEventListeners();
     }
@@ -605,6 +985,7 @@ $conn->close();
     }
 
     window.addEventListener("load", function() {
+      setupIndexFoodBannerCarousel();
       setTimeout(() => loadContent(), 200);
     });
   </script>

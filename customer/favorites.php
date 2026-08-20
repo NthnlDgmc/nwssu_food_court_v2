@@ -557,7 +557,7 @@ $avatarInitial = mb_strtoupper(mb_substr($firstName, 0, 1));
                   <h3 class="text-sm font-semibold text-gray-900 truncate">${escapeHtml(item.item_name)}</h3>
                   <p class="text-xs text-gray-500 mt-0.5 truncate">${escapeHtml(item.stall_name)}</p>
                 </div>
-                <span class="text-base font-bold text-emerald-600 shrink-0">&#8369;${item.price.toFixed(0)}</span>
+                <span class="text-sm font-bold text-emerald-600 shrink-0">&#8369;${item.price.toFixed(2)}</span>
               </div>
               <button type="button" data-item-id="${item.menu_item_id}" ${item.is_available ? "" : "disabled"} class="w-full mt-2 py-2 ${item.is_available ? "bg-emerald-600 hover:bg-emerald-700" : "bg-gray-300 cursor-not-allowed"} text-white text-xs font-medium flex items-center justify-center gap-1 transition-all add-btn rounded-[3px]">
                 ${item.is_available ? ADD_BTN_DEFAULT_HTML : ADD_BTN_UNAVAILABLE_HTML}

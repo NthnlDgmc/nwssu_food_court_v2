@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../config/database.php';
+require_once '../config/vapid.php';
 require_once '../config/version.php';
 require_once '../config/app-url.php';
 
@@ -11,7 +12,7 @@ if (!isset($_SESSION['customer_id'])) {
 
 $customerId = $_SESSION['customer_id'];
 
-$statusCheckStmt = $conn->prepare("SELECT status, email, contact_number FROM customers WHERE customer_id = ? LIMIT 1");
+  $statusCheckStmt = $conn->prepare("SELECT status, email, contact_number, customer_type, first_name, last_name FROM customers WHERE customer_id = ? LIMIT 1");
 $statusCheckStmt->bind_param("i", $customerId);
 $statusCheckStmt->execute();
 $statusCheckRow = $statusCheckStmt->get_result()->fetch_assoc();
@@ -105,31 +106,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
   $action = $_POST['action'];
 
   if ($action === 'edit_profile') {
-    $firstName = toTitleCase(trim($_POST['first_name'] ?? ''));
-    $lastName = toTitleCase(trim($_POST['last_name'] ?? ''));
+    $isGuestAccount = ($statusCheckRow['customer_type'] ?? '') === 'guest';
+    $firstName = $isGuestAccount
+      ? toTitleCase(trim($_POST['first_name'] ?? ''))
+      : toTitleCase(trim($statusCheckRow['first_name'] ?? ''));
+    $lastName = $isGuestAccount
+      ? toTitleCase(trim($_POST['last_name'] ?? ''))
+      : toTitleCase(trim($statusCheckRow['last_name'] ?? ''));
     $contact = trim($_POST['contact_number'] ?? '');
     $email = strtolower(preg_replace('/\s+/', '', $_POST['email'] ?? ''));
     $removeImage = ($_POST['remove_image'] ?? '') === '1';
 
-    if ($firstName === '') {
-      echo json_encode(['success' => false, 'message' => 'First name is required.']);
-      $conn->close();
-      exit;
-    }
-    if (!preg_match("/^[\p{L}\s'\-]+$/u", $firstName)) {
-      echo json_encode(['success' => false, 'message' => 'First name can only contain letters.']);
-      $conn->close();
-      exit;
-    }
-    if ($lastName === '') {
-      echo json_encode(['success' => false, 'message' => 'Last name is required.']);
-      $conn->close();
-      exit;
-    }
-    if (!preg_match("/^[\p{L}\s'\-]+$/u", $lastName)) {
-      echo json_encode(['success' => false, 'message' => 'Last name can only contain letters.']);
-      $conn->close();
-      exit;
+    if ($isGuestAccount) {
+      if ($firstName === '') {
+        echo json_encode(['success' => false, 'message' => 'First name is required.']);
+        $conn->close();
+        exit;
+      }
+      if (!preg_match("/^[\p{L}\s'\-]+$/u", $firstName)) {
+        echo json_encode(['success' => false, 'message' => 'First name can only contain letters.']);
+        $conn->close();
+        exit;
+      }
+      if ($lastName === '') {
+        echo json_encode(['success' => false, 'message' => 'Last name is required.']);
+        $conn->close();
+        exit;
+      }
+      if (!preg_match("/^[\p{L}\s'\-]+$/u", $lastName)) {
+        echo json_encode(['success' => false, 'message' => 'Last name can only contain letters.']);
+        $conn->close();
+        exit;
+      }
     }
     if ($contact === '') {
       echo json_encode(['success' => false, 'message' => 'Please enter a contact number.']);
@@ -147,8 +155,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
       exit;
     }
 
-    $stmt = $conn->prepare("UPDATE customers SET first_name = ?, last_name = ?, contact_number = ?, email = ? WHERE customer_id = ?");
-    $stmt->bind_param("ssssi", $firstName, $lastName, $contact, $email, $customerId);
+    if ($isGuestAccount) {
+      $stmt = $conn->prepare("UPDATE customers SET first_name = ?, last_name = ?, contact_number = ?, email = ? WHERE customer_id = ?");
+      $stmt->bind_param("ssssi", $firstName, $lastName, $contact, $email, $customerId);
+    } else {
+      $stmt = $conn->prepare("UPDATE customers SET contact_number = ?, email = ? WHERE customer_id = ?");
+      $stmt->bind_param("ssi", $contact, $email, $customerId);
+    }
     $ok = $stmt->execute();
     $stmt->close();
 
@@ -435,11 +448,17 @@ if (!$initialProfile) {
 
         <div class="grid grid-cols-2 gap-2">
           <div class="rounded-md bg-white border border-gray-200 shadow-sm p-3 text-center">
-            <p id="statOrders" class="text-base font-bold text-emerald-600"></p>
+            <div id="statOrdersSkeleton" class="flex justify-center animate-pulse" aria-hidden="true">
+              <span class="block h-5 w-10 bg-gray-200 rounded"></span>
+            </div>
+            <p id="statOrders" class="hidden text-base font-bold text-emerald-600"></p>
             <p class="text-[10px] text-gray-400 mt-0.5">Completed Orders</p>
           </div>
           <div class="rounded-md bg-white border border-gray-200 shadow-sm p-3 text-center">
-            <p id="statMemberSince" class="text-base font-bold text-emerald-600"></p>
+            <div id="statMemberSinceSkeleton" class="flex justify-center animate-pulse" aria-hidden="true">
+              <span class="block h-5 w-16 bg-gray-200 rounded"></span>
+            </div>
+            <p id="statMemberSince" class="hidden text-base font-bold text-emerald-600"></p>
             <p class="text-[10px] text-gray-400 mt-0.5">Member Since</p>
           </div>
         </div>
@@ -464,13 +483,27 @@ if (!$initialProfile) {
                 <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
               </svg>
             </button>
+            <button
+              id="notificationsBtn"
+              class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">
+              <span class="w-8 h-8 bg-gray-100 flex items-center justify-center shrink-0 rounded-[3px]">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+                </svg>
+              </span>
+              <span class="flex-1 text-xs font-medium text-gray-700">Notifications</span>
+              <span id="notifStatusBadge" class="text-[10px] text-gray-400 shrink-0">Checking...</span>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-300 shrink-0">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+              </svg>
+            </button>
           </div>
         </div>
 
         <div class="rounded-md bg-white border border-gray-200 shadow-sm overflow-hidden">
           <div class="p-4 border-b border-gray-100">
             <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
-              Support
+              App
             </p>
           </div>
           <div class="divide-y divide-gray-100">
@@ -504,22 +537,19 @@ if (!$initialProfile) {
               </svg>
             </button>
             <button
-              id="termsPrivacyBtn"
+              id="aboutBtn"
               class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">
               <span class="w-8 h-8 bg-gray-100 flex items-center justify-center shrink-0 rounded-[3px]">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-                </svg>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg>
               </span>
-              <span class="flex-1 text-xs font-medium text-gray-700">Terms &amp; Privacy Policy</span>
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-300 shrink-0">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-              </svg>
+              <span class="flex-1 min-w-0 text-xs font-medium text-gray-700">About</span>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-300 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
             </button>
             <div class="w-full flex items-center gap-3 px-4 py-3">
               <span class="w-8 h-8 bg-gray-100 flex items-center justify-center shrink-0 rounded-[3px]">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25A2.25 2.25 0 0 1 6 3h12a2.25 2.25 0 0 1 2.25 2.25v13.5A2.25 2.25 0 0 1 18 21H6a2.25 2.25 0 0 1-2.25-2.25V5.25Z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 9 3 3-3 3m4.5 0h3" />
                 </svg>
               </span>
               <span class="flex-1 text-xs font-medium text-gray-700">App Version</span>
@@ -528,29 +558,84 @@ if (!$initialProfile) {
           </div>
         </div>
 
-        <button
-          id="logoutBtn"
-          class="w-full py-2.5 border border-red-200 text-red-500 text-xs font-semibold hover:bg-red-50 transition-colors flex items-center justify-center gap-1.5 rounded-[3px]">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="1.5"
-            stroke="currentColor"
-            class="w-4 h-4">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75" />
-          </svg>
-          Log Out
-        </button>
+        <div class="rounded-md bg-white border border-gray-200 shadow-sm overflow-hidden">
+          <div class="p-4 border-b border-gray-100">
+            <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+              Legal
+            </p>
+          </div>
+          <div class="divide-y divide-gray-100">
+            <button
+              id="privacyPolicyBtn"
+              class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">
+              <span class="w-8 h-8 bg-gray-100 flex items-center justify-center shrink-0 rounded-[3px]">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
+                </svg>
+              </span>
+              <span class="flex-1 text-xs font-medium text-gray-700">Privacy Policy</span>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-300 shrink-0">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+              </svg>
+            </button>
+            <button
+              id="termsConditionsBtn"
+              class="account-row w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">
+              <span class="w-8 h-8 bg-gray-100 flex items-center justify-center shrink-0 rounded-[3px]">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                </svg>
+              </span>
+              <span class="flex-1 text-xs font-medium text-gray-700">Terms &amp; Conditions</span>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-300 shrink-0">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+              </svg>
+            </button>
+          </div>
+        </div>
 
-        <button
-          id="deleteAccountBtn"
-          class="w-full py-2 text-[11px] text-gray-400 hover:text-red-500 transition-colors text-center">
-          Delete My Account
-        </button>
+        <div class="rounded-md bg-white border border-gray-200 shadow-sm overflow-hidden">
+          <div class="p-4 border-b border-gray-100">
+            <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+              Account Actions
+            </p>
+          </div>
+          <div class="p-4 space-y-3">
+            <button
+              id="logoutBtn"
+              class="w-full flex items-center gap-3 px-3 py-3 border border-gray-200 text-left hover:bg-gray-50 transition-colors rounded-[3px]">
+              <span class="w-8 h-8 bg-gray-100 flex items-center justify-center shrink-0 rounded-[3px]">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75" />
+                </svg>
+              </span>
+              <span class="flex-1 min-w-0">
+                <span class="block text-xs font-semibold text-gray-700">Logout</span>
+                <span class="block text-[10px] text-gray-400 mt-0.5">Sign out from this account</span>
+              </span>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-300 shrink-0">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+              </svg>
+            </button>
+
+            <button
+              id="deleteAccountBtn"
+              class="w-full flex items-center gap-3 px-3 py-3 border border-red-100 text-left hover:bg-red-50 transition-colors rounded-[3px]">
+              <span class="w-8 h-8 bg-red-50 flex items-center justify-center shrink-0 rounded-[3px]">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-red-500">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-10.153.562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                </svg>
+              </span>
+              <span class="flex-1 min-w-0">
+                <span class="block text-xs font-semibold text-red-600">Delete Account</span>
+                <span class="block text-[10px] text-red-400 mt-0.5">Permanently delete your account and data</span>
+              </span>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-red-200 shrink-0">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -657,7 +742,7 @@ if (!$initialProfile) {
             class="hidden" />
           <div class="text-center">
             <p class="text-[10px] text-gray-400">
-              Profile Photo <span class="text-gray-300">(optional)</span>
+              Profile Photo
             </p>
             <button
               type="button"
@@ -692,6 +777,7 @@ if (!$initialProfile) {
             <input type="text" id="fieldLastName" class="w-full px-3 py-2.5 bg-white border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-600 rounded-[3px]" />
           </div>
         </div>
+        <p id="nameEditHint" class="hidden text-[10px] text-gray-400 -mt-1">Name details are managed by the Registrar and cannot be edited here.</p>
 
         <div>
           <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Contact Number</label>
@@ -910,6 +996,35 @@ if (!$initialProfile) {
   </div>
 
   <div
+    id="notificationsModal"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center px-4">
+    <div class="modal-overlay absolute inset-0" id="closeNotificationsOverlay"></div>
+    <div class="bg-white w-full max-w-md relative z-10 shadow-2xl rounded-md">
+      <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+        <h2 class="font-bold text-gray-800 text-sm">Notifications</h2>
+        <button id="closeNotificationsBtn" class="p-1 hover:bg-gray-100 rounded-[3px]">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div class="p-4">
+        <div class="flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-xs font-semibold text-gray-800">Push Notifications</p>
+            <p id="notifStatusLabel" class="text-[10px] text-gray-400 mt-0.5">Checking...</p>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer shrink-0">
+            <input type="checkbox" id="notifToggle" class="sr-only peer" />
+            <div class="w-11 h-6 bg-gray-300 peer-checked:bg-emerald-500 rounded-full transition-colors"></div>
+            <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5 shadow"></div>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
     id="termsPrivacyModal"
     class="fixed inset-0 z-50 hidden flex items-center justify-center px-4">
     <div class="modal-overlay absolute inset-0" id="closeTermsPrivacyOverlay"></div>
@@ -1027,6 +1142,25 @@ if (!$initialProfile) {
         <button id="closeShareAppBtn" class="flex-1 py-2.5 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors rounded-[3px]">
         Close
       </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="aboutModal" class="fixed inset-0 z-50 hidden flex items-center justify-center px-4">
+    <div class="modal-overlay absolute inset-0" id="closeAboutOverlay"></div>
+    <div class="bg-white w-full max-w-sm max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl rounded-md">
+      <div class="p-5 text-center border-b border-gray-100">
+        <div class="w-14 h-14 mx-auto bg-emerald-50 flex items-center justify-center rounded-full mb-3"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7 text-emerald-600"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg></div>
+        <p class="text-sm font-bold leading-snug text-gray-800 max-w-[280px] mx-auto">A Web-Based Food Court Ordering System for Northwest Samar State University</p>
+        <p class="text-[10px] text-emerald-600 font-semibold uppercase tracking-wide mt-1">Capstone Project</p>
+      </div>
+      <div class="p-5 space-y-4">
+        <p class="text-xs leading-relaxed text-gray-600 text-center">A campus food ordering platform designed to make ordering from participating food stalls faster, easier, and more organized.</p>
+        <div class="rounded-md bg-gray-50 border border-gray-200 p-3 text-center"><p class="text-[10px] text-gray-400 uppercase tracking-wide">Institution</p><p class="text-xs font-semibold text-gray-700 mt-1">Northwest Samar State University (Main Campus)</p></div>
+        <div><p class="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-2">Capstone Team</p><div class="grid grid-cols-2 gap-2"><div class="bg-emerald-50 border border-emerald-100 rounded-[3px] px-3 py-2 col-span-2"><p class="text-[10px] text-emerald-600 font-semibold uppercase tracking-wide">Capstone Adviser</p><p class="text-xs font-semibold text-gray-700 mt-0.5">Ma’am Arnelyn Heleran</p></div><div class="bg-emerald-50 border border-emerald-100 rounded-[3px] px-3 py-2 col-span-2"><p class="text-[10px] text-emerald-600 font-semibold uppercase tracking-wide">Lead Developer &amp; UI/UX Designer</p><p class="text-xs font-semibold text-gray-700 mt-0.5">Nathaniel Dagamac</p></div><div class="bg-gray-50 border border-gray-100 rounded-[3px] px-3 py-2"><p class="text-[10px] text-gray-400">Documentation Lead</p><p class="text-xs font-medium text-gray-700 mt-0.5">Sheryl Caibog</p></div><div class="bg-gray-50 border border-gray-100 rounded-[3px] px-3 py-2"><p class="text-[10px] text-gray-400">Assistant Developer</p><p class="text-xs font-medium text-gray-700 mt-0.5">Jenuel Castillo</p></div><div class="bg-gray-50 border border-gray-100 rounded-[3px] px-3 py-2"><p class="text-[10px] text-gray-400">System Tester</p><p class="text-xs font-medium text-gray-700 mt-0.5">Rina Baga</p></div><div class="bg-gray-50 border border-gray-100 rounded-[3px] px-3 py-2"><p class="text-[10px] text-gray-400">System Tester</p><p class="text-xs font-medium text-gray-700 mt-0.5">Erica Piamonte</p></div><div class="bg-gray-50 border border-gray-100 rounded-[3px] px-3 py-2"><p class="text-[10px] text-gray-400">System Tester</p><p class="text-xs font-medium text-gray-700 mt-0.5">Jio Canaman</p></div></div></div>
+        <div class="flex items-center justify-between text-[10px] text-gray-400 pt-1"><span>Version <?php echo APP_VERSION; ?></span><span>For NwSSU campus use</span></div>
+        <p class="border-t border-gray-100 pt-3 text-[10px] leading-relaxed text-gray-400 text-center">Developed for academic purposes by the capstone team of Northwest Samar State University.</p>
+        <button id="closeAboutBtn" class="w-full py-2.5 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors rounded-[3px]">Close</button>
       </div>
     </div>
   </div>
@@ -1233,6 +1367,141 @@ if (!$initialProfile) {
       return ((first[0] || "") + (last[0] || "")).toUpperCase();
     }
 
+    const VAPID_PUBLIC_KEY = "<?php echo VAPID_PUBLIC_KEY; ?>";
+
+    function urlBase64ToUint8Array(base64String) {
+      const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+      const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+      const rawData = window.atob(base64);
+      const outputArray = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+      return outputArray;
+    }
+
+    async function subscribeToPush() {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        throw new Error("Push notifications are not supported on this device.");
+      }
+      const registration = await navigator.serviceWorker.register("../service-worker.js");
+      await navigator.serviceWorker.ready;
+      const existingSubscription = await registration.pushManager.getSubscription();
+      const subscription = existingSubscription || await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+      const response = await fetch("../save-push-subscription.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(subscription)
+      });
+      const result = await response.json();
+      if (!response.ok || result.success === false) throw new Error(result.message || "Failed to save notification subscription.");
+      return subscription;
+    }
+
+    async function unsubscribeFromPush() {
+      if (!("serviceWorker" in navigator)) return;
+      const registration = await navigator.serviceWorker.getRegistration("../service-worker.js");
+      if (!registration) return;
+      const subscription = await registration.pushManager.getSubscription();
+      if (!subscription) return;
+      const response = await fetch("../remove-push-notifications.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: subscription.endpoint })
+      });
+      const responseText = await response.text();
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (error) {
+        throw new Error("The notification server returned an invalid response.");
+      }
+      if (!response.ok || result.success === false) throw new Error(result.message || "Failed to remove notification subscription.");
+      await subscription.unsubscribe();
+    }
+
+    function openNotificationsModal() {
+      document.getElementById("notificationsModal").classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeNotificationsModal() {
+      document.getElementById("notificationsModal").classList.add("hidden");
+      document.body.style.overflow = "";
+    }
+
+    async function setupNotificationToggle() {
+      const toggle = document.getElementById("notifToggle");
+      const label = document.getElementById("notifStatusLabel");
+      const badge = document.getElementById("notifStatusBadge");
+      document.getElementById("notificationsBtn").addEventListener("click", openNotificationsModal);
+      document.getElementById("closeNotificationsBtn").addEventListener("click", closeNotificationsModal);
+      document.getElementById("closeNotificationsOverlay").addEventListener("click", closeNotificationsModal);
+
+      if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+        toggle.disabled = true;
+        label.textContent = "Not supported on this device";
+        badge.textContent = "Unsupported";
+        return;
+      }
+
+      let isSubscribed = false;
+      if (Notification.permission === "granted") {
+        const registration = await navigator.serviceWorker.getRegistration("../service-worker.js");
+        if (registration) {
+          const subscription = await registration.pushManager.getSubscription();
+          if (subscription) {
+            isSubscribed = true;
+            fetch("../save-push-subscription.php", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(subscription)
+            }).catch(error => console.error("[push] Failed to refresh subscription:", error));
+          }
+        }
+      }
+
+      toggle.checked = isSubscribed;
+      label.textContent = isSubscribed ? "On" : "Off";
+      badge.textContent = isSubscribed ? "On" : "Off";
+
+      toggle.addEventListener("change", async () => {
+        toggle.disabled = true;
+        try {
+          if (toggle.checked) {
+            if (Notification.permission === "denied") {
+              toggle.checked = false;
+              alert("Notifications are blocked in your browser settings. Please enable them manually to turn this on.");
+              return;
+            }
+            const permission = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
+            if (permission !== "granted") {
+              toggle.checked = false;
+              return;
+            }
+            await subscribeToPush();
+            localStorage.removeItem("notificationsOptedOut");
+            label.textContent = "On";
+            badge.textContent = "On";
+            showToast("Notifications turned on");
+          } else {
+            await unsubscribeFromPush();
+            localStorage.setItem("notificationsOptedOut", "1");
+            label.textContent = "Off";
+            badge.textContent = "Off";
+            showToast("Notifications turned off");
+          }
+        } catch (error) {
+          console.error("[push] Notification toggle failed:", error);
+          toggle.checked = !toggle.checked;
+          showToast(error.message || "Unable to update notifications.", "warning");
+        } finally {
+          toggle.disabled = false;
+        }
+      });
+    }
+
     function isValidEmail(val) {
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
     }
@@ -1259,9 +1528,10 @@ if (!$initialProfile) {
     let initialEditProfileState = {};
 
     function checkForEditProfileChanges() {
+      const isGuestAccount = customerAccount.customerType === "guest";
       const changed =
-        document.getElementById("fieldFirstName").value !== initialEditProfileState.firstName ||
-        document.getElementById("fieldLastName").value !== initialEditProfileState.lastName ||
+        (isGuestAccount && document.getElementById("fieldFirstName").value !== initialEditProfileState.firstName) ||
+        (isGuestAccount && document.getElementById("fieldLastName").value !== initialEditProfileState.lastName) ||
         document.getElementById("fieldContact").value !== initialEditProfileState.contact ||
         document.getElementById("fieldEmail").value !== initialEditProfileState.email ||
         currentProfileImageFile !== null ||
@@ -1357,6 +1627,14 @@ if (!$initialProfile) {
       document.getElementById("fieldLastName").value = customerAccount.lastName;
       document.getElementById("fieldContact").value = customerAccount.contactNumber;
       document.getElementById("fieldEmail").value = customerAccount.email || "";
+      const isGuestAccount = customerAccount.customerType === "guest";
+      ["fieldFirstName", "fieldLastName"].forEach((id) => {
+        const field = document.getElementById(id);
+        field.disabled = !isGuestAccount;
+        field.classList.toggle("locked-input", !isGuestAccount);
+        field.classList.toggle("bg-white", isGuestAccount);
+      });
+      document.getElementById("nameEditHint").classList.toggle("hidden", isGuestAccount);
       document.getElementById("editProfileError").classList.add("hidden");
       document.getElementById("editProfileError").classList.remove("flex");
       document
@@ -1373,11 +1651,13 @@ if (!$initialProfile) {
         getInitials(customerAccount.firstName, customerAccount.lastName),
       );
       initialEditProfileState = {
-        firstName: customerAccount.firstName,
-        lastName: customerAccount.lastName,
         contact: customerAccount.contactNumber,
         email: customerAccount.email || "",
       };
+      if (isGuestAccount) {
+        initialEditProfileState.firstName = customerAccount.firstName;
+        initialEditProfileState.lastName = customerAccount.lastName;
+      }
       document.getElementById("saveEditProfileBtn").disabled = true;
       document.getElementById("editProfileModal").classList.remove("hidden");
       document.body.style.overflow = "hidden";
@@ -1470,8 +1750,10 @@ if (!$initialProfile) {
         return;
       }
 
-      customerAccount.firstName = firstName;
-      customerAccount.lastName = lastName;
+      if (customerAccount.customerType === "guest") {
+        customerAccount.firstName = firstName;
+        customerAccount.lastName = lastName;
+      }
       customerAccount.contactNumber = contact;
       customerAccount.email = email;
       if (res.profile_image !== undefined) {
@@ -1671,31 +1953,39 @@ if (!$initialProfile) {
       document.getElementById("editProfileBtn").addEventListener("click", openEditProfileModal);
       document.getElementById("closeEditProfileBtn").addEventListener("click", closeEditProfileModal);
       document.getElementById("cancelEditProfileBtn").addEventListener("click", closeEditProfileModal);
+      document.getElementById("closeEditProfileOverlay").addEventListener("click", closeEditProfileModal);
       document.getElementById("saveEditProfileBtn").addEventListener("click", saveEditProfile);
 
-      ["fieldFirstName", "fieldLastName", "fieldContact", "fieldEmail"].forEach((id) => {
+      const isGuestAccount = customerAccount.customerType === "guest";
+      ["fieldContact", "fieldEmail"].forEach((id) => {
         document.getElementById(id).addEventListener("input", checkForEditProfileChanges);
       });
 
-      [document.getElementById("fieldFirstName"), document.getElementById("fieldLastName")].forEach((el) => {
-        el.addEventListener("input", () => {
-          const cursorPos = el.selectionStart;
-          const cleaned = el.value.replace(/[^\p{L}\s'-]/gu, "");
-          if (cleaned !== el.value) {
-            const removedCount = el.value.length - cleaned.length;
-            el.value = cleaned;
-            const newPos = Math.max(0, cursorPos - removedCount);
-            el.setSelectionRange(newPos, newPos);
-          }
+      if (isGuestAccount) {
+        ["fieldFirstName", "fieldLastName"].forEach((id) => {
+          document.getElementById(id).addEventListener("input", checkForEditProfileChanges);
         });
 
-        el.addEventListener("blur", () => {
-          if (el.value.trim()) {
-            el.value = toTitleCase(el.value);
-            checkForEditProfileChanges();
-          }
+        [document.getElementById("fieldFirstName"), document.getElementById("fieldLastName")].forEach((el) => {
+          el.addEventListener("input", () => {
+            const cursorPos = el.selectionStart;
+            const cleaned = el.value.replace(/[^\p{L}\s'-]/gu, "");
+            if (cleaned !== el.value) {
+              const removedCount = el.value.length - cleaned.length;
+              el.value = cleaned;
+              const newPos = Math.max(0, cursorPos - removedCount);
+              el.setSelectionRange(newPos, newPos);
+            }
+          });
+
+          el.addEventListener("blur", () => {
+            if (el.value.trim()) {
+              el.value = toTitleCase(el.value);
+              checkForEditProfileChanges();
+            }
+          });
         });
-      });
+      }
 
       function checkFieldEmailValidity() {
         const em = document.getElementById("fieldEmail").value.trim();
@@ -1775,6 +2065,7 @@ if (!$initialProfile) {
       document.getElementById("changePasswordBtn").addEventListener("click", openChangePasswordModal);
       document.getElementById("closeChangePasswordBtn").addEventListener("click", closeChangePasswordModal);
       document.getElementById("cancelChangePasswordBtn").addEventListener("click", closeChangePasswordModal);
+      document.getElementById("closeChangePasswordOverlay").addEventListener("click", closeChangePasswordModal);
       document.getElementById("saveChangePasswordBtn").addEventListener("click", saveChangePassword);
 
       makePasswordToggle("toggleCurrentPasswordBtn", "fieldCurrentPassword", "currentPwEyeIcon");
@@ -1815,8 +2106,14 @@ if (!$initialProfile) {
 
       document.getElementById("profileSubtext").textContent = customerAccount.email;
 
-      document.getElementById("statOrders").textContent = customerAccount.totalOrders;
-      document.getElementById("statMemberSince").textContent = customerAccount.memberSince;
+      const statOrders = document.getElementById("statOrders");
+      const statMemberSince = document.getElementById("statMemberSince");
+      statOrders.textContent = customerAccount.totalOrders;
+      statMemberSince.textContent = customerAccount.memberSince;
+      statOrders.classList.remove("hidden");
+      statMemberSince.classList.remove("hidden");
+      document.getElementById("statOrdersSkeleton").classList.add("hidden");
+      document.getElementById("statMemberSinceSkeleton").classList.add("hidden");
 
       document.getElementById("profileSkeleton").classList.add("hidden");
       document.getElementById("profileContent").classList.remove("hidden");
@@ -1880,8 +2177,19 @@ if (!$initialProfile) {
         modal.classList.add("hidden");
         document.body.style.overflow = "";
       };
-      document.getElementById("termsPrivacyBtn").addEventListener("click", openModal);
+      document.getElementById("privacyPolicyBtn").addEventListener("click", openModal);
+      document.getElementById("termsConditionsBtn").addEventListener("click", openModal);
       document.getElementById("closeTermsPrivacyBtn").addEventListener("click", closeModal);
+      document.getElementById("closeTermsPrivacyOverlay").addEventListener("click", closeModal);
+    }
+
+    function setupAboutModal() {
+      const modal = document.getElementById("aboutModal");
+      const openModal = () => { modal.classList.remove("hidden"); document.body.style.overflow = "hidden"; };
+      const closeModal = () => { modal.classList.add("hidden"); document.body.style.overflow = ""; };
+      document.getElementById("aboutBtn").addEventListener("click", openModal);
+      document.getElementById("closeAboutBtn").addEventListener("click", closeModal);
+      document.getElementById("closeAboutOverlay").addEventListener("click", closeModal);
     }
 
     function setupShareAppModal() {
@@ -1896,6 +2204,7 @@ if (!$initialProfile) {
       };
       document.getElementById("shareAppBtn").addEventListener("click", openModal);
       document.getElementById("closeShareAppBtn").addEventListener("click", closeModal);
+      document.getElementById("closeShareAppOverlay").addEventListener("click", closeModal);
 
       document.getElementById("copyShareAppUrlBtn").addEventListener("click", async () => {
         const url = document.getElementById("shareAppUrlText").textContent;
@@ -2008,6 +2317,7 @@ if (!$initialProfile) {
     function setupLogoutModal() {
       document.getElementById("logoutBtn").addEventListener("click", openLogoutModal);
       document.getElementById("cancelLogoutBtn").addEventListener("click", closeLogoutModal);
+      document.getElementById("closeLogoutOverlay").addEventListener("click", closeLogoutModal);
       document.getElementById("confirmLogoutBtn").addEventListener("click", () => {
         window.location.href = "../auth/logout.php";
       });
@@ -2016,6 +2326,7 @@ if (!$initialProfile) {
     function setupDeleteAccountModal() {
       document.getElementById("deleteAccountBtn").addEventListener("click", openDeleteAccountModal);
       document.getElementById("cancelDeleteAccountBtn").addEventListener("click", closeDeleteAccountModal);
+      document.getElementById("closeDeleteAccountOverlay").addEventListener("click", closeDeleteAccountModal);
       document.getElementById("confirmDeleteAccountBtn").addEventListener("click", confirmDeleteAccount);
       makePasswordToggle("toggleDeleteAccountPasswordBtn", "deleteAccountPassword", "deleteAccountPwEyeIcon");
     }
@@ -2025,7 +2336,9 @@ if (!$initialProfile) {
       setupBackButton();
       setupEditProfileModal();
       setupChangePasswordModal();
+      setupNotificationToggle();
       setupShareAppModal();
+      setupAboutModal();
       setupInstallApp();
       setupTermsPrivacyModal();
       setupLogoutModal();

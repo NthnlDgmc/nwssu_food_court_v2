@@ -1,12 +1,3 @@
-<?php
-session_start();
-require_once '../config/database.php';
-
-if (!isset($_SESSION['owner_id'])) {
-    header('Location: ../auth/login.php');
-    exit;
-}
-?>
 <!doctype html>
 <html lang="en">
 
@@ -104,6 +95,30 @@ if (!isset($_SESSION['owner_id'])) {
                 opacity: 1;
                 transform: translateY(0);
             }
+        }
+
+        /*
+         * This grid intentionally uses native CSS instead of Tailwind responsive
+         * utilities. It keeps the 2-column desktop layout working even when the
+         * local tailwind.css build does not include lg:grid-cols-2.
+         */
+        .analytics-chart-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: .75rem;
+            margin-bottom: .75rem;
+            align-items: stretch;
+        }
+
+        @media (min-width: 1024px) {
+            .analytics-chart-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        .analytics-chart-grid > .analytics-card {
+            min-width: 0;
+            height: 100%;
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -242,20 +257,9 @@ if (!isset($_SESSION['owner_id'])) {
                     </div>
                 </div>
 
-                <div class="rounded-md bg-white border border-gray-200 shadow-sm overflow-hidden mb-3 fade-up" style="animation-delay:.26s">
-                    <div class="p-4 border-b border-gray-100 flex items-center justify-between gap-3">
-                        <div>
-                            <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Customer Roles</p>
-                            <p class="text-[10px] text-gray-400 mt-0.5">Who is ordering from your school stall</p>
-                        </div><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-300">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.125a6.75 6.75 0 0 0-13.5 0m13.5 0v-.75a6.75 6.75 0 0 0-13.5 0v.75m13.5 0h3.75a2.25 2.25 0 0 0 2.25-2.25v-.75a6 6 0 0 0-6-6 6 6 0 0 0-5.15 2.92M12 5.25a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
-                        </svg>
-                    </div>
-                    <div id="roleBreakdown" class="divide-y divide-gray-100"></div>
-                </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-3">
-                    <div class="rounded-md bg-white border border-gray-200 shadow-sm overflow-hidden fade-up" style="animation-delay:.28s">
+                <!-- Desktop chart grid: row 1 = Orders by Hour + Sales Trend; row 2 = Best Selling Items + Busiest Hours. -->
+                <div class="analytics-chart-grid">
+                    <div class="analytics-card rounded-md bg-white border border-gray-200 shadow-sm overflow-hidden fade-up" style="animation-delay:.28s">
                         <div class="p-4 border-b border-gray-100 flex items-center justify-between gap-3">
                             <div>
                                 <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Orders by Hour</p>
@@ -267,7 +271,8 @@ if (!isset($_SESSION['owner_id'])) {
                             <div class="flex justify-between mt-2 text-[9px] text-gray-400"><span>7 AM</span><span>9 AM</span><span>11 AM</span><span>1 PM</span><span>3 PM</span><span>5 PM</span></div>
                         </div>
                     </div>
-                    <div class="rounded-md bg-white border border-gray-200 shadow-sm overflow-hidden fade-up" style="animation-delay:.32s">
+
+                    <div class="analytics-card rounded-md bg-white border border-gray-200 shadow-sm overflow-hidden fade-up" style="animation-delay:.32s">
                         <div class="p-4 border-b border-gray-100 flex items-center justify-between gap-3">
                             <div>
                                 <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Sales Trend</p>
@@ -284,17 +289,16 @@ if (!isset($_SESSION['owner_id'])) {
                             <div class="flex justify-between mt-2 text-[9px] text-gray-400"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
                         </div>
                     </div>
-                </div>
 
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-3">
-                    <div class="rounded-md bg-white border border-gray-200 shadow-sm overflow-hidden fade-up" style="animation-delay:.36s">
+                    <div class="analytics-card rounded-md bg-white border border-gray-200 shadow-sm overflow-hidden fade-up" style="animation-delay:.36s">
                         <div class="p-4 border-b border-gray-100">
                             <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Best Selling Items</p>
                             <p class="text-[10px] text-gray-400 mt-0.5">Student favorites this week</p>
                         </div>
                         <div id="topItems" class="divide-y divide-gray-100"></div>
                     </div>
-                    <div class="rounded-md bg-white border border-gray-200 shadow-sm overflow-hidden fade-up" style="animation-delay:.4s">
+
+                    <div class="analytics-card rounded-md bg-white border border-gray-200 shadow-sm overflow-hidden fade-up" style="animation-delay:.4s">
                         <div class="p-4 border-b border-gray-100">
                             <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Busiest Hours</p>
                             <p class="text-[10px] text-gray-400 mt-0.5">When to prepare extra servings</p>
@@ -605,43 +609,6 @@ if (!isset($_SESSION['owner_id'])) {
             }
         };
 
-        const roleData = [{
-                name: "Students",
-                detail: "Learners",
-                orders: 124,
-                sales: 18840,
-                share: 67,
-                color: "bg-emerald-500",
-                icon: "M12 14.25a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm-7.5 6a7.5 7.5 0 0 1 15 0"
-            },
-            {
-                name: "Faculty",
-                detail: "Teaching staff",
-                orders: 24,
-                sales: 4370,
-                share: 13,
-                color: "bg-sky-500",
-                icon: "M12 6.75V3m0 3.75a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM5.25 21a6.75 6.75 0 0 1 13.5 0"
-            },
-            {
-                name: "Staff",
-                detail: "School personnel",
-                orders: 29,
-                sales: 4280,
-                share: 16,
-                color: "bg-amber-500",
-                icon: "M12 6.75V3m0 3.75a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM5.25 21a6.75 6.75 0 0 1 13.5 0"
-            },
-            {
-                name: "Guests",
-                detail: "Visitors and others",
-                orders: 9,
-                sales: 970,
-                share: 4,
-                color: "bg-violet-500",
-                icon: "M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0"
-            }
-        ];
 
         let activeRange = "today";
         const money = value => "₱" + Number(value).toLocaleString("en-PH");
@@ -669,9 +636,6 @@ if (!isset($_SESSION['owner_id'])) {
             document.getElementById("topItems").innerHTML = items.map((item, index) => `<div class="flex items-center gap-3 px-4 py-3"><span class="w-5 text-[10px] text-gray-400">0${index + 1}</span><span class="w-7 h-7 ${item.color} bg-opacity-10 flex items-center justify-center rounded-[3px]"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75v10.5m-3.75-3.75h7.5M4.5 6.75h15v10.5h-15z" /></svg></span><span class="flex-1 min-w-0 text-[11px] font-medium text-gray-700 truncate">${item.name}</span><span class="text-[11px] font-semibold text-gray-800">${item.count}</span><span class="w-12 h-1 bg-gray-100 rounded-full overflow-hidden"><span class="block h-full ${item.color} rounded-full" style="width:${item.share * 2.2}%"></span></span></div>`).join("");
         }
 
-        function renderRoles() {
-            document.getElementById("roleBreakdown").innerHTML = roleData.map(role => `<div class="px-4 py-3 flex items-center gap-3"><span class="w-8 h-8 ${role.color} bg-opacity-10 flex items-center justify-center rounded-[3px]"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500"><path stroke-linecap="round" stroke-linejoin="round" d="${role.icon}" /></svg></span><div class="flex-1 min-w-0"><p class="text-[11px] font-semibold text-gray-700">${role.name}</p><p class="text-[10px] text-gray-400 mt-0.5">${role.detail} · ${role.orders} orders</p></div><div class="w-28 sm:w-40"><div class="h-1.5 bg-gray-100 rounded-full overflow-hidden"><div class="h-full ${role.color} rounded-full transition-all duration-700" style="width:${role.share}%"></div></div></div><div class="text-right w-16 shrink-0"><p class="text-[11px] font-semibold text-gray-800">${money(role.sales)}</p><p class="text-[10px] text-gray-400 mt-0.5">${role.share}% share</p></div></div>`).join("");
-        }
 
         function renderBusy(items) {
             document.getElementById("busyHours").innerHTML = items.map((item, index) => `<div><div class="flex items-center justify-between gap-2 mb-1"><span class="text-[11px] font-medium text-gray-700">${item.label}</span><span class="text-[10px] font-semibold text-gray-500">${item.count} orders</span></div><div class="h-1.5 bg-gray-100 rounded-full overflow-hidden"><div class="h-full ${index === 0 ? "bg-emerald-600" : "bg-emerald-400"} rounded-full transition-all duration-700" style="width:${item.share}%"></div></div></div>`).join("");
@@ -699,7 +663,6 @@ if (!isset($_SESSION['owner_id'])) {
             renderItems(data.items);
             renderBusy(data.busy);
             renderRecent(data.recent);
-            renderRoles();
         }
 
         document.querySelectorAll(".range-btn").forEach(button => button.addEventListener("click", () => {

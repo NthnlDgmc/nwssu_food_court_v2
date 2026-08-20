@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nwssu-foodcourt-v1';
+const CACHE_NAME = 'nwssu-foodcourt-v2';
 const OFFLINE_URL = 'offline.php';
 
 const STATIC_ASSETS = [
